@@ -1,9 +1,14 @@
 // src/materials/materials.controller.ts
-import { Controller, Get, Post, Body, Patch, Param, Delete, UsePipes, ValidationPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UsePipes, ValidationPipe, UseGuards } from '@nestjs/common';
 import { MaterialsService } from './materials.service';
 import { CreateMaterialDto } from './dto/create-material.dto';
 import { UpdateMaterialDto } from './dto/update-material.dto';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
+@ApiBearerAuth() // Esto le dice a Swagger que este endpoint requiere un token
+@ApiTags('Materials')
+@UseGuards(JwtAuthGuard)
 @Controller('materials')
 export class MaterialsController {
   constructor(private readonly materialsService: MaterialsService) { }

@@ -16,6 +16,7 @@ async function bootstrap() {
     .setTitle('API de Presupuestos de Encimeras')
     .setDescription('Documentación de la API para la aplicación de presupuestos.')
     .setVersion('1.0')
+    .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document); // La UI de Swagger estará en /api
@@ -28,5 +29,3 @@ async function bootstrap() {
   logger.log(`📄 Documentación de Swagger disponible en: ${await app.getUrl()}/api`);
 }
 bootstrap();
-
-
