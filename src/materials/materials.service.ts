@@ -39,11 +39,19 @@ export class MaterialsService {
     return updatedMaterial;
   }
 
-  async remove(id: string): Promise<Material> {
-    const deletedMaterial = await this.materialModel.findByIdAndDelete(id).exec();
-    if (!deletedMaterial) {
-      throw new NotFoundException(`Material with ID "${id}" not found`);
+  // async remove(id: string): Promise<Material> {
+  //   const deletedMaterial = await this.materialModel.findByIdAndDelete(id).exec();
+  //   if (!deletedMaterial) {
+  //     throw new NotFoundException(`Material with ID "${id}" not found`);
+  //   }
+  //   return deletedMaterial;
+  // }
+
+  async remove(ids: string[]): Promise<{ deletedCount: number }> {
+    const result = await this.materialModel.deleteMany({ _id: { $in: ids } });
+    if (result.deletedCount === 0) {
+      throw new NotFoundException(`No materials found with the provided IDs.`);
     }
-    return deletedMaterial;
+    return { deletedCount: result.deletedCount };
   }
 }

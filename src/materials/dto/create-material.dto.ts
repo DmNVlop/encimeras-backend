@@ -3,10 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNotEmpty, IsNumber, IsArray, IsBoolean, IsOptional } from 'class-validator';
 
 export class CreateMaterialDto {
-  @ApiProperty({
-    description: 'El nombre único del material',
-    example: 'Silestone Blanco Zeus',
-  })
+  @ApiProperty({ example: 'MDF Hidrófugo', description: 'Nombre del material' })
   @IsString()
   @IsNotEmpty()
   name: string;
@@ -29,45 +26,47 @@ export class CreateMaterialDto {
   imageUrl?: string;
 
   @ApiProperty({
-    description: 'El precio del material por metro cuadrado',
-    example: 95.50,
+    example: ['1C', '2C'],
+    description: 'Caras disponibles para este material',
+    type: [String]
   })
-  @IsNumber()
+  @IsArray()
+  @IsString({ each: true })
   @IsNotEmpty()
-  pricePerSquareMeter: number;
+  faces: string[];
 
   @ApiProperty({
-    description: 'Lista de grosores disponibles en cm',
-    type: [Number],
-    example: [2, 3],
+    example: ['Basic', 'Platinium'],
+    description: 'Grupos de precio a los que pertenece este material',
+    type: [String]
   })
+  @IsArray()
+  @IsString({ each: true })
+  @IsNotEmpty()
+  groups: string[];
+
+  @ApiProperty({ example: [16, 19], description: 'Grosores disponibles en mm' })
   @IsArray()
   @IsNotEmpty()
   thicknesses: number[];
 
-  @ApiProperty({
-    description: 'Lista de acabados disponibles para el material',
-    type: [String],
-    example: ['Pulido', 'Mate'],
-  })
+  @ApiProperty({ example: ['Seda', 'Brillo'], description: 'Acabados disponibles' })
   @IsArray()
   @IsString({ each: true })
   @IsNotEmpty()
   finishes: string[];
 
-  @ApiProperty({
-    description: 'La categoría a la que pertenece el material',
-    example: 'Cuarzo',
-  })
+  @ApiProperty({ example: 'Melaminas, Crudo, Fenix', description: 'Categoría del material' })
   @IsString()
   @IsNotEmpty()
   category: string;
 
-  @ApiProperty({
-    description: 'Indica si el material está activo y disponible para presupuestar',
-    default: true,
-    required: false,
-  })
+  @ApiProperty({ example: 'DM, HPL, Compacto', description: 'Tipo del material' })
+  @IsString()
+  @IsNotEmpty()
+  type: string;
+
+  @ApiProperty({ required: false, default: true })
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;

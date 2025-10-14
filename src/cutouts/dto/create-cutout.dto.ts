@@ -1,8 +1,13 @@
 // src/cutouts/dto/create-cutout.dto.ts
 import { IsString, IsNotEmpty, IsNumber, IsEnum } from 'class-validator';
-import { CutoutType } from '../schemas/cutout.schema';
+import { ApiProperty } from '@nestjs/swagger';
 export class CreateCutoutDto {
     @IsString() @IsNotEmpty() name: string;
+
     @IsNumber() @IsNotEmpty() price: number;
-    @IsEnum(CutoutType) @IsNotEmpty() type: CutoutType;
+
+    @ApiProperty({ description: 'Tipo de corte (ej. SINK, HOB, OTHER)', example: 'SINK' })
+    @IsString()
+    @IsNotEmpty()
+    type: string;
 }

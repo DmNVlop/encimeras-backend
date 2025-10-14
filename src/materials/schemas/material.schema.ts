@@ -16,8 +16,11 @@ export class Material {
     @Prop()
     imageUrl: string;
 
-    @Prop({ required: true })
-    pricePerSquareMeter: number;
+    @Prop({ type: [String], required: true, default: [] })
+    faces: string[]; // ej: ['1C', '2C']
+
+    @Prop({ type: [String], required: true, default: [] })
+    groups: string[]; // ej: ['Basic', 'Platinium']
 
     @Prop({ type: [Number], required: true })
     thicknesses: number[];
@@ -27,6 +30,9 @@ export class Material {
 
     @Prop({ required: true, trim: true })
     category: string;
+
+    @Prop({ required: true, trim: true })
+    type: string;
 
     @Prop({ default: true })
     isActive: boolean;

@@ -1,11 +1,14 @@
 // src/quotes/quotes.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+
 import { Material, MaterialDocument } from '../materials/schemas/material.schema';
 import { EdgeProfile, EdgeProfileDocument } from '../edge-profiles/schemas/edge-profile.schema';
 import { Cutout, CutoutDocument } from '../cutouts/schemas/cutout.schema';
 import { Quote, QuoteDocument } from './schemas/quote.schema';
+import { PriceConfig, PriceConfigDocument } from 'src/price-configs/schemas/price-config.schema';
+
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { CalculateQuoteDto } from './dto/quote.dto';
 
@@ -16,47 +19,117 @@ export class QuotesService {
     @InjectModel(Material.name) private materialModel: Model<MaterialDocument>,
     @InjectModel(EdgeProfile.name) private edgeProfileModel: Model<EdgeProfileDocument>,
     @InjectModel(Cutout.name) private cutoutModel: Model<CutoutDocument>,
+    @InjectModel(PriceConfig.name) private priceConfigModel: Model<PriceConfigDocument>,
   ) { }
 
-  async calculatePrice(dto: CalculateQuoteDto) {
-    const material = await this.materialModel.findById(dto.materialId);
-    if (!material) throw new NotFoundException('Material not found');
+  // IMPORTANTE: Esta función debe ser IDÉNTICA a la del PriceConfigsService
+  private generateCombinationKey(attributes: Record<string, string>): string {
+    return Object.keys(attributes)
+      .sort()
+      .map(key => `${key}:${attributes[key]}`)
+      .join('_');
+  }
 
-    const edgeProfile = await this.edgeProfileModel.findById(dto.edgeProfileId);
+  async calculatePrice(calculateQuoteDto: CalculateQuoteDto) {
+    const {
+      materialId,
+      shape,
+      measurements,
+      edgeProfileId,
+      cutouts,
+      thickness,
+      finish,
+      group,
+      face,
+      type
+    } = calculateQuoteDto;
+
+    // --- Construir el objeto de atributos para buscar el precio ---
+    const priceAttributes = {
+      mat_thickness: thickness,
+      mat_finish: finish,
+      mat_group: group,
+      mat_face: face,
+      mat_type: type
+    };
+
+    // --- Construir la clave y buscar el precio ---
+    const combinationKey = this.generateCombinationKey(priceAttributes);
+    const priceConfig = await this.priceConfigModel.findOne({ combinationKey }).exec();
+
+    if (!priceConfig) {
+      throw new NotFoundException(`No se encontró un precio para la combinación de atributos seleccionada. (${combinationKey})`);
+    }
+
+    const pricePerSquareMeter = priceConfig.pricePerSquareMeter;
+
+    // ====================================================================
+    // VALIDACIÓN DE MEDIDAS SEGÚN LA FORMA
+    // ====================================================================
+    if (shape === 'L' && !measurements.ladoB) {
+      throw new BadRequestException('Para la forma "L", la medida "ladoB" es requerida.');
+    }
+    if (shape === 'U' && (!measurements.ladoB || !measurements.ladoC)) {
+      throw new BadRequestException('Para la forma "U", las medidas "ladoB" y "ladoC" son requeridas.');
+    }
+    // ====================================================================
+
+    const material = await this.materialModel.findById(materialId);
+    if (!material) throw new NotFoundException('Material no encontrado');
+
+    const edgeProfile = await this.edgeProfileModel.findById(edgeProfileId);
     if (!edgeProfile) throw new NotFoundException('Edge profile not found');
 
-    // 1. Calculate Area (in square meters)
-    const m = dto.measurements;
+    // Calculate Area (in square meters)
     let area = 0;
-    const fondoM = m.fondo / 100;
-    if (dto.shape === 'Lineal') area = (m.ladoA / 100) * fondoM;
-    if (dto.shape === 'L') area = ((m.ladoA / 100) * fondoM) + (((m.ladoB - m.fondo) / 100) * fondoM);
-    if (dto.shape === 'U') area = ((m.ladoA / 100) * fondoM) + (((m.ladoB - (2 * m.fondo)) / 100) * fondoM) + ((m.ladoC / 100) * fondoM);
+    const fondoM = measurements.fondo / 1000;
+    const ladoAM = measurements.ladoA / 1000;
 
-    // 2. Calculate Costs
-    const materialCost = area * material.pricePerSquareMeter;
+    // Calculate Costs
+    if (shape === 'Lineal') {
+      area = ladoAM * fondoM;
+    } else if (shape === 'L') {
+      const ladoBM = measurements.ladoB! / 1000;
+      area = (ladoAM * fondoM) + ((ladoBM - fondoM) * fondoM);
+    } else if (shape === 'U') {
+      const ladoBM = measurements.ladoB! / 1000;
+      const ladoCM = measurements.ladoC! / 1000;
+      area = (ladoAM * fondoM) + ((ladoBM - 2 * fondoM) * fondoM) + (ladoCM * fondoM);
+    }
 
+    const materialCost = area * pricePerSquareMeter;
+
+    // Lógica de coste de canto
     let edgeMeters = 0;
-    if (dto.shape === 'Lineal') edgeMeters = (m.ladoA / 100);
-    if (dto.shape === 'L') edgeMeters = (m.ladoA / 100) + (m.ladoB / 100);
-    if (dto.shape === 'U') edgeMeters = (m.ladoA / 100) + (m.ladoB / 100) + (m.ladoC / 100);
+    if (shape === 'Lineal') {
+      edgeMeters = (ladoAM / 1000);
+    }
+    if (shape === 'L') {
+      const ladoBM = measurements.ladoB! / 1000;
+      edgeMeters = (ladoAM / 1000) + (ladoBM / 1000);
+    }
+    if (shape === 'U') {
+      const ladoBM = measurements.ladoB! / 1000;
+      const ladoCM = measurements.ladoC! / 1000;
+      edgeMeters = (ladoAM / 1000) + (ladoBM / 1000) + (ladoCM / 1000);
+    }
+
     const edgeCost = edgeMeters * edgeProfile.pricePerMeter;
 
+    // Lógica de coste de cortes (Trabajos)
     let cutoutsCost = 0;
-    if (dto.cutouts && dto.cutouts.length > 0) {
-      for (const item of dto.cutouts) {
+    if (cutouts && cutouts.length > 0) {
+      for (const item of cutouts) {
         const cutout = await this.cutoutModel.findById(item.cutoutId);
         if (cutout) cutoutsCost += cutout.price * item.quantity;
       }
     }
 
-    const backsplashCost = (dto.backsplashMeters || 0) * material.pricePerSquareMeter;
+    // Total Price and Breakdown
+    const totalPrice = materialCost + edgeCost + cutoutsCost;
+    const priceBreakdown = { materialCost, edgeCost, cutoutsCost };
 
-    // 3. Total Price and Breakdown
-    const totalPrice = materialCost + edgeCost + cutoutsCost + backsplashCost;
-    const priceBreakdown = { materialCost, edgeCost, cutoutsCost, backsplashCost };
-
-    return { totalPrice, priceBreakdown };
+    return { totalPrice, priceBreakdown, area };
   }
 
   async create(createQuoteDto: CreateQuoteDto): Promise<Quote> {
@@ -71,7 +144,7 @@ export class QuotesService {
       priceBreakdown,
     });
 
-    // TODO - Day 10: Send email notification with Nodemailer
+    // TODO - Send email notification with Nodemailer
 
     return newQuote.save();
   }

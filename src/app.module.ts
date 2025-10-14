@@ -8,6 +8,8 @@ import { CutoutsModule } from './cutouts/cutouts.module';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { QuotesModule } from './quotes/quotes.module';
+import { PriceConfigsModule } from './price-configs/price-configs.module';
+import { AttributesModule } from './attributes/attributes.module';
 import * as path from 'path';
 
 @Module({
@@ -17,7 +19,7 @@ import * as path from 'path';
     // Esto construye una ruta absoluta desde el directorio del archivo actual
     // hasta la raíz del proyecto y luego al archivo .env
     envFilePath: path.resolve(__dirname, '..', '.env'),
-  }), DatabaseModule, MaterialsModule, EdgeProfilesModule, CutoutsModule, AuthModule, QuotesModule],
+  }), DatabaseModule, MaterialsModule, EdgeProfilesModule, CutoutsModule, AuthModule, QuotesModule, PriceConfigsModule, AttributesModule],
   controllers: [AppController],
   providers: [AppService],
 })

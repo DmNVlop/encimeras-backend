@@ -21,9 +21,17 @@ export class EdgeProfilesService {
     if (!profile) throw new NotFoundException(`EdgeProfile with ID "${id}" not found`);
     return profile;
   }
-  async remove(id: string) {
-    const profile = await this.edgeProfileModel.findByIdAndDelete(id).exec();
-    if (!profile) throw new NotFoundException(`EdgeProfile with ID "${id}" not found`);
-    return profile;
+  // async remove(id: string) {
+  //   const profile = await this.edgeProfileModel.findByIdAndDelete(id).exec();
+  //   if (!profile) throw new NotFoundException(`EdgeProfile with ID "${id}" not found`);
+  //   return profile;
+  // }
+
+  async remove(ids: string[]): Promise<{ deletedCount: number }> {
+    const result = await this.edgeProfileModel.deleteMany({ _id: { $in: ids } });
+    if (result.deletedCount === 0) {
+      throw new NotFoundException(`No EdgeProfiles found with the provided IDs.`);
+    }
+    return { deletedCount: result.deletedCount };
   }
 }

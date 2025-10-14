@@ -21,9 +21,16 @@ export class CutoutsService {
     if (!cutout) throw new NotFoundException(`Cutout with ID "${id}" not found`);
     return cutout;
   }
-  async remove(id: string) {
-    const cutout = await this.cutoutModel.findByIdAndDelete(id).exec();
-    if (!cutout) throw new NotFoundException(`Cutout with ID "${id}" not found`);
-    return cutout;
+  // async remove(id: string) {
+  //   const cutout = await this.cutoutModel.findByIdAndDelete(id).exec();
+  //   if (!cutout) throw new NotFoundException(`Cutout with ID "${id}" not found`);
+  //   return cutout;
+  // }
+  async remove(ids: string[]): Promise<{ deletedCount: number }> {
+    const result = await this.cutoutModel.deleteMany({ _id: { $in: ids } });
+    if (result.deletedCount === 0) {
+      throw new NotFoundException(`No cutouts found with the provided IDs.`);
+    }
+    return { deletedCount: result.deletedCount };
   }
 }
