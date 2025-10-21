@@ -24,11 +24,17 @@ export class Quote {
     @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Material', required: true })
     material: Material;
 
-    @Prop({ required: true })
-    thickness: number;
+    // @Prop({ required: true })
+    // thickness: number;
 
-    @Prop({ required: true })
-    finish: string;
+    // @Prop({ required: true })
+    // finish: string;
+
+    @Prop({ type: Object, required: true })
+    priceAttributes: {
+        type: string;
+        attributes: Record<string, string>;
+    };
 
     @Prop({ enum: ['Lineal', 'L', 'U'], required: true })
     shape: string;

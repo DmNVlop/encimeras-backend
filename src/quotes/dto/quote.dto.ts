@@ -1,6 +1,6 @@
 // src/quotes/dto/quote.dto.ts
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsObject, IsMongoId, IsOptional, IsArray, ValidateNested, IsNumber, Min } from 'class-validator';
+import { IsString, IsNotEmpty, IsObject, IsMongoId, IsOptional, IsArray, ValidateNested, IsNumber, Min, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
 
 // ====================================================================
@@ -48,32 +48,27 @@ class CutoutSelectionDto {
 export class CalculateQuoteDto {
     @IsString()
     @IsNotEmpty()
+    @IsMongoId()
     materialId: string;
 
-    // --- ATRIBUTOS DINÁMICOS PARA EL PRECIO ---
-    @IsString()
-    @IsNotEmpty()
-    thickness: string;
-
-    @IsString()
-    @IsNotEmpty()
-    finish: string;
-
-    @IsString()
-    @IsNotEmpty()
-    group: string;
-
-    @IsString()
-    @IsNotEmpty()
-    face: string;
-
+    // --- INICIO DE ATRIBUTOS DINÁMICOS ---
+    @ApiProperty({ description: 'Tipo de material (ej. "Porcelánico")', example: 'Porcelánico' })
     @IsString()
     @IsNotEmpty()
     type: string;
-    // --- FIN DE ATRIBUTOS ---
+
+    @ApiProperty({
+        description: 'Objeto dinámico con los atributos de precio seleccionados',
+        example: { MAT_GROUP: 'Basic', MAT_THICKNESS: '20mm', MAT_FACE: '1C' },
+    })
+    @IsObject()
+    @IsNotEmpty()
+    attributes: Record<string, string>;
+    // --- FIN DE ATRIBUTOS DINÁMICOS ---
 
     @IsString()
     @IsNotEmpty()
+    @IsEnum(['Lineal', 'L', 'U'])
     shape: 'Lineal' | 'L' | 'U';
 
     @IsObject()
@@ -83,6 +78,7 @@ export class CalculateQuoteDto {
 
     @IsString()
     @IsOptional()
+    @IsMongoId()
     edgeProfileId?: string;
 
     @IsArray()
@@ -91,5 +87,3 @@ export class CalculateQuoteDto {
     @IsOptional()
     cutouts?: CutoutSelectionDto[];
 }
-
-

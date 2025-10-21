@@ -27,55 +27,70 @@ export class QuotesService {
     return Object.keys(attributes)
       .sort()
       .map(key => `${key}:${attributes[key]}`)
-      .join('_');
+      .join('||');
   }
 
   async calculatePrice(calculateQuoteDto: CalculateQuoteDto) {
+    // --- CAMBIO 1: Nueva desestructuración ---
+    // Recibimos 'attributes' y 'type' directamente desde el DTO.
     const {
       materialId,
       shape,
       measurements,
       edgeProfileId,
       cutouts,
-      thickness,
-      finish,
-      group,
-      face,
-      type
+      type, // <-- Nuevo campo del DTO
+      attributes, // <-- Nuevo objeto del DTO
     } = calculateQuoteDto;
 
-    // --- Construir el objeto de atributos para buscar el precio ---
-    const priceAttributes = {
-      mat_thickness: thickness,
-      mat_finish: finish,
-      mat_group: group,
-      mat_face: face,
-      mat_type: type
-    };
+    // 2. Buscamos el material para obtener su "receta" de precios.
+    const material = await this.materialModel.findById(materialId).exec();
+    if (!material) {
+      throw new NotFoundException('Material no encontrado');
+    }
+    const requiredAttributeKeys = material.pricingAttributes;
 
-    // --- Construir la clave y buscar el precio ---
+    // --- CAMBIO 2: Lógica de Atributos Simplificada ---
+    // Ya no necesitamos la lógica de 'dtoKey'.
+    // Simplemente validamos que el objeto 'attributes' recibido es completo.
+    const priceAttributes: Record<string, string> = {};
+    for (const key of requiredAttributeKeys) {
+      if (attributes[key]) {
+        priceAttributes[key] = attributes[key];
+      } else {
+        // Si un atributo requerido por la receta no viene en el objeto 'attributes', lanzamos un error.
+        throw new BadRequestException(
+          `Falta el atributo requerido "${key}" para calcular el precio de este material.`,
+        );
+      }
+    }
+    // --- FIN CAMBIO 2 ---
+
+    // 4. Generamos la clave de combinación con el conjunto filtrado de atributos.
     const combinationKey = this.generateCombinationKey(priceAttributes);
-    const priceConfig = await this.priceConfigModel.findOne({ combinationKey }).exec();
+    const priceConfig = await this.priceConfigModel
+      .findOne({ combinationKey })
+      .exec();
 
     if (!priceConfig) {
-      throw new NotFoundException(`No se encontró un precio para la combinación de atributos seleccionada. (${combinationKey})`);
+      throw new NotFoundException(
+        `No se encontró un precio para la combinación de atributos seleccionada. (${combinationKey})`,
+      );
     }
-
     const pricePerSquareMeter = priceConfig.pricePerSquareMeter;
 
     // ====================================================================
-    // VALIDACIÓN DE MEDIDAS SEGÚN LA FORMA
+    // EL RESTO DE LA LÓGICA DE CÁLCULO (Área, Costes) NO CAMBIA
     // ====================================================================
     if (shape === 'L' && !measurements.ladoB) {
-      throw new BadRequestException('Para la forma "L", la medida "ladoB" es requerida.');
+      throw new BadRequestException(
+        'Para la forma "L", la medida "ladoB" es requerida.',
+      );
     }
     if (shape === 'U' && (!measurements.ladoB || !measurements.ladoC)) {
       throw new BadRequestException('Para la forma "U", las medidas "ladoB" y "ladoC" son requeridas.');
     }
     // ====================================================================
-
-    const material = await this.materialModel.findById(materialId);
-    if (!material) throw new NotFoundException('Material no encontrado');
 
     const edgeProfile = await this.edgeProfileModel.findById(edgeProfileId);
     if (!edgeProfile) throw new NotFoundException('Edge profile not found');
