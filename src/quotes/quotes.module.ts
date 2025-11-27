@@ -3,21 +3,20 @@ import { QuotesService } from './quotes.service';
 import { QuotesController } from './quotes.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Quote, QuoteSchema } from './schemas/quote.schema';
-import { Material, MaterialSchema } from 'src/materials/schemas/material.schema';
-import { EdgeProfile, EdgeProfileSchema } from 'src/edge-profiles/schemas/edge-profile.schema';
-import { Cutout, CutoutSchema } from 'src/cutouts/schemas/cutout.schema';
-import { PriceConfig, PriceConfigSchema } from 'src/price-configs/schemas/price-config.schema';
+import { MaterialsModule } from 'src/materials/materials.module';
+import { PriceConfigsModule } from 'src/price-configs/price-configs.module';
+import { AddonsModule } from 'src/addons/addons.module';
+import { MeasurementRuleSetsModule } from 'src/measurement-rule-sets/measurement-rule-sets.module';
+import { MainPiecesModule } from 'src/main-pieces/main-pieces.module';
 
 @Module({
   imports: [
-    // 1. Registra todos los schemas que el QuotesService necesita inyectar.
-    MongooseModule.forFeature([
-      { name: Quote.name, schema: QuoteSchema },
-      { name: Material.name, schema: MaterialSchema },
-      { name: EdgeProfile.name, schema: EdgeProfileSchema },
-      { name: Cutout.name, schema: CutoutSchema },
-      { name: PriceConfig.name, schema: PriceConfigSchema },
-    ]),
+    MaterialsModule,
+    PriceConfigsModule,
+    AddonsModule,
+    MeasurementRuleSetsModule,
+    MainPiecesModule, // El nuevo servicio para crear tramos
+    MongooseModule.forFeature([{ name: Quote.name, schema: QuoteSchema }]),
   ],
   controllers: [QuotesController],
   providers: [QuotesService],

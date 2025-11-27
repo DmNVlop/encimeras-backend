@@ -1,34 +1,51 @@
-import {
-    IsArray,
-    IsEnum,
-    IsNotEmpty,
-    IsOptional,
-    IsString,
-} from 'class-validator';
+import { IsArray, IsEnum, IsNotEmpty, IsOptional, IsString, IsUrl } from "class-validator";
 
 export class CreateAddonDto {
-    @IsString()
-    @IsNotEmpty()
-    code: string;
+  @IsString()
+  @IsNotEmpty()
+  code: string;
 
-    @IsString()
-    @IsNotEmpty()
-    name: string;
+  @IsString()
+  @IsNotEmpty()
+  name: string;
 
-    @IsEnum(['COMBINATION_BASED', 'RANGE_BASED', 'FIXED'])
-    pricingType: 'COMBINATION_BASED' | 'RANGE_BASED' | 'FIXED';
+  // --- NUEVOS CAMPOS VALIDADOS ---
+  @IsEnum(["TRABAJO", "ENSAMBLAJE", "COMPLEMENTO", "OTRO"])
+  @IsNotEmpty()
+  category: string;
 
-    @IsString()
-    @IsNotEmpty()
-    productTypeMap: string;
+  @IsArray()
+  @IsString({ each: true })
+  @IsNotEmpty()
+  allowedMaterialCategories: string[];
 
-    // --- Campos Opcionales ---
-    @IsOptional()
-    @IsString()
-    measurementRuleSetId?: string;
+  @IsArray()
+  @IsEnum(["quantity", "length_ml", "width_mm", "height_mm"], { each: true })
+  @IsNotEmpty()
+  requiredMeasurements: string[];
 
-    @IsOptional()
-    @IsArray()
-    @IsString({ each: true })
-    inheritedAttributes?: string[];
+  @IsString()
+  @IsOptional()
+  imageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  // --- CAMPOS EXISTENTES ---
+  @IsEnum(["COMBINATION_BASED", "RANGE_BASED", "FIXED"])
+  pricingType: "COMBINATION_BASED" | "RANGE_BASED" | "FIXED";
+
+  @IsString()
+  @IsNotEmpty()
+  productTypeMap: string;
+
+  @IsOptional()
+  @IsString()
+  measurementRuleSetId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  inheritedAttributes?: string[];
 }

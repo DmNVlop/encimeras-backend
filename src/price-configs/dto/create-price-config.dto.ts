@@ -1,18 +1,17 @@
 // src/price-configs/dto/create-price-config.dto.ts
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsNumber, IsPositive, IsObject } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, IsPositive } from 'class-validator';
 
 export class CreatePriceConfigDto {
-    @ApiProperty({
-        description: 'Objeto clave-valor con los atributos que definen el precio.',
-        example: { mat_group: 'Basic', mat_face: '1C' },
-    })
-    @IsObject()
+    @IsString()
     @IsNotEmpty()
-    attributes: Record<string, string>;
+    productType: string;
 
-    @ApiProperty({ description: 'Precio por m² para esta combinación.' })
-    @IsNumber()
+    @IsString()
     @IsNotEmpty()
-    pricePerSquareMeter: number;
+    combinationKey: string;
+
+    @IsNumber()
+    @IsPositive()
+    price: number;
 }

@@ -1,16 +1,14 @@
 // src/materials/materials.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { CreateMaterialDto } from './dto/create-material.dto';
-import { UpdateMaterialDto } from './dto/update-material.dto';
-import { Material, MaterialDocument, PricingRecipe } from './schemas/material.schema';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { InjectModel } from "@nestjs/mongoose";
+import { Model } from "mongoose";
+import { CreateMaterialDto } from "./dto/create-material.dto";
+import { UpdateMaterialDto } from "./dto/update-material.dto";
+import { Material, MaterialDocument, PricingRecipe } from "./schemas/material.schema";
 
 @Injectable()
 export class MaterialsService {
-  constructor(
-    @InjectModel(Material.name) private materialModel: Model<MaterialDocument>,
-  ) { }
+  constructor(@InjectModel(Material.name) private materialModel: Model<MaterialDocument>) {}
 
   async create(createMaterialDto: CreateMaterialDto): Promise<Material> {
     const createdMaterial = new this.materialModel(createMaterialDto);
@@ -19,30 +17,32 @@ export class MaterialsService {
 
   async findAll() {
     // Usamos el pipeline de agregación para unir colecciones y contar
-    return this.materialModel.aggregate([
-      {
-        // 1. "Left Join" a la colección de combinaciones válidas
-        // El nombre 'validcombinations' debe coincidir con el nombre de tu colección en MongoDB (plural y en minúsculas)
-        $lookup: {
-          from: 'validcombinations',
-          localField: '_id',
-          foreignField: 'materialId',
-          as: 'combinations', // Nombre temporal del array con las combinaciones encontradas
+    return this.materialModel
+      .aggregate([
+        {
+          // 1. "Left Join" a la colección de combinaciones válidas
+          // El nombre 'validcombinations' debe coincidir con el nombre de tu colección en MongoDB (plural y en minúsculas)
+          $lookup: {
+            from: "validcombinations",
+            localField: "_id",
+            foreignField: "materialId",
+            as: "combinations", // Nombre temporal del array con las combinaciones encontradas
+          },
         },
-      },
-      {
-        // 2. Añadimos el nuevo campo con el contador
-        $addFields: {
-          validCombinationsCount: { $size: '$combinations' }, // Usamos $size para contar los elementos del array
+        {
+          // 2. Añadimos el nuevo campo con el contador
+          $addFields: {
+            validCombinationsCount: { $size: "$combinations" }, // Usamos $size para contar los elementos del array
+          },
         },
-      },
-      {
-        // 3. Proyectamos los campos finales para limpiar la respuesta
-        $project: {
-          combinations: 0, // Eliminamos el array temporal que ya no necesitamos
+        {
+          // 3. Proyectamos los campos finales para limpiar la respuesta
+          $project: {
+            combinations: 0, // Eliminamos el array temporal que ya no necesitamos
+          },
         },
-      },
-    ]).exec();
+      ])
+      .exec();
   }
 
   async findOne(id: string): Promise<Material> {
@@ -54,9 +54,7 @@ export class MaterialsService {
   }
 
   async update(id: string, updateMaterialDto: UpdateMaterialDto): Promise<Material> {
-    const updatedMaterial = await this.materialModel
-      .findByIdAndUpdate(id, updateMaterialDto, { new: true })
-      .exec();
+    const updatedMaterial = await this.materialModel.findByIdAndUpdate(id, updateMaterialDto, { new: true }).exec();
     if (!updatedMaterial) {
       throw new NotFoundException(`Material with ID "${id}" not found`);
     }
@@ -80,28 +78,21 @@ export class MaterialsService {
   }
 
   /**
-     * Encuentra un material por su ID y extrae la receta de precios
-     * para un tipo de producto específico.
-     * Este método será fundamental para el servicio de Quotes.
-     * @param materialId El ID del material a buscar.
-     * @param productType El tipo de producto ('COUNTERTOP', 'CLADDING', etc.).
-     * @returns La receta de precios correspondiente.
-     * @throws NotFoundException si el material o la receta no se encuentran.
-     */
-  async getPricingRecipe(
-    materialId: string,
-    productType: string,
-  ): Promise<PricingRecipe> {
+   * Encuentra un material por su ID y extrae la receta de precios
+   * para un tipo de producto específico.
+   * Este método será fundamental para el servicio de Quotes.
+   * @param materialId El ID del material a buscar.
+   * @param productType El tipo de producto ('ENCIMERA', 'CLADDING', etc.).
+   * @returns La receta de precios correspondiente.
+   * @throws NotFoundException si el material o la receta no se encuentran.
+   */
+  async getPricingRecipe(materialId: string, productType: string): Promise<PricingRecipe> {
     const material = await this.findOne(materialId);
 
-    const recipe = material.pricingRecipes.find(
-      (r) => r.productType === productType,
-    );
+    const recipe = material.pricingRecipes.find((r) => r.productType === productType);
 
     if (!recipe) {
-      throw new NotFoundException(
-        `Pricing recipe for product type "${productType}" not found in material "${material.name}"`,
-      );
+      throw new NotFoundException(`Pricing recipe for product type "${productType}" not found in material "${material.name}"`);
     }
 
     return recipe;

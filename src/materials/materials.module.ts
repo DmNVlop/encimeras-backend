@@ -10,5 +10,6 @@ import { Material, MaterialSchema } from './schemas/material.schema';
   ],
   controllers: [MaterialsController],
   providers: [MaterialsService],
+  exports: [MaterialsService]
 })
 export class MaterialsModule { }

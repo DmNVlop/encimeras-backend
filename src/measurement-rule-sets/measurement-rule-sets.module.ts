@@ -11,6 +11,7 @@ import { MeasurementRuleSet, MeasurementRuleSetSchema } from './schemas/measurem
     ]),
   ],
   providers: [MeasurementRuleSetsService],
-  controllers: [MeasurementRuleSetsController]
+  controllers: [MeasurementRuleSetsController],
+  exports: [MeasurementRuleSetsService]
 })
 export class MeasurementRuleSetsModule { }

@@ -10,5 +10,6 @@ import { PriceConfig, PriceConfigSchema } from './schemas/price-config.schema';
   ],
   controllers: [PriceConfigsController],
   providers: [PriceConfigsService],
+  exports: [PriceConfigsService]
 })
 export class PriceConfigsModule { }

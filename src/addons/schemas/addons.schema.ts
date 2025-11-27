@@ -1,42 +1,65 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import * as mongoose from 'mongoose';
-import { MeasurementRuleSet } from 'src/measurement-rule-sets/schemas/measurement-rule-sets.schema';
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import * as mongoose from "mongoose";
+import { MeasurementRuleSet } from "src/measurement-rule-sets/schemas/measurement-rule-sets.schema";
 
 export type AddonDocument = Addon & mongoose.Document;
 
 @Schema({ timestamps: true })
 export class Addon {
-    @Prop({ required: true, unique: true, trim: true })
-    code: string; // e.g., 'CLADDING', 'COVING_ML', 'SIDE_PANEL'
+  @Prop({ required: true, unique: true, trim: true })
+  code: string;
 
-    @Prop({ required: true, trim: true })
-    name: string; // e.g., 'Aplacado', 'Copete ML', 'Costado Visto'
+  @Prop({ required: true, trim: true })
+  name: string;
 
-    // El "cerebro" que determina el método de cálculo
-    @Prop({
-        required: true,
-        enum: ['COMBINATION_BASED', 'RANGE_BASED', 'FIXED'],
-    })
-    pricingType: 'COMBINATION_BASED' | 'RANGE_BASED' | 'FIXED';
+  // --- NUEVO: Categorización Visual para el Frontend ---
+  @Prop({
+    required: true,
+    enum: ["TRABAJO", "ENSAMBLAJE", "COMPLEMENTO", "OTRO"],
+    default: "OTRO",
+  })
+  category: string;
 
-    // El "enlace" al tipo de producto en price-configs y materials
-    @Prop({ required: true, trim: true })
-    productTypeMap: string; // e.g., 'CLADDING', 'COVING_ML_RANGE', 'SIDE_PANEL_FIXED'
+  // --- NUEVO: Filtro de Compatibilidad ---
+  // Ej: ['HPL', 'COMPACTO'] o ['*'] para todos
+  @Prop({ type: [String], required: true, default: [] })
+  allowedMaterialCategories: string[];
 
-    // --- CAMPOS CONDICIONALES --- //
-    // Estos campos solo son relevantes para ciertos pricingType
+  // --- NUEVO: Configuración de Inputs del Frontend ---
+  // Ej: ['length_ml'] o ['quantity', 'width_mm']
+  @Prop({
+    type: [String],
+    required: true,
+    enum: ["quantity", "length_ml", "width_mm", "height_mm"],
+    default: ["quantity"],
+  })
+  requiredMeasurements: string[];
 
-    // Para pricingType: 'RANGE_BASED' (e.g., Copete)
-    @Prop({
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'MeasurementRuleSet',
-        required: false,
-    })
-    measurementRuleSetId?: MeasurementRuleSet;
+  @Prop({ required: false })
+  imageUrl?: string;
 
-    // Para pricingType: 'RANGE_BASED' (e.g., Copete), para heredar MAT_GROUP
-    @Prop({ type: [String], required: false })
-    inheritedAttributes?: string[];
+  @Prop({ required: false })
+  description?: string;
+
+  // --- LÓGICA DE PRECIOS (EXISTENTE) ---
+  @Prop({
+    required: true,
+    enum: ["COMBINATION_BASED", "RANGE_BASED", "FIXED"],
+  })
+  pricingType: "COMBINATION_BASED" | "RANGE_BASED" | "FIXED";
+
+  @Prop({ required: true, trim: true })
+  productTypeMap: string;
+
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "MeasurementRuleSet",
+    required: false,
+  })
+  measurementRuleSetId?: MeasurementRuleSet;
+
+  @Prop({ type: [String], required: false })
+  inheritedAttributes?: string[];
 }
 
 export const AddonSchema = SchemaFactory.createForClass(Addon);

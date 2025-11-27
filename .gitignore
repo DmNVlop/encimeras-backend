@@ -2,15 +2,17 @@
 /dist
 /node_modules
 /build
+/public
 res
 RES
 
 # Environment variables
 .env
-.env.*
 /.env
 .env.production
 /.env.production
+.env.*
+/.env.*
 
 # Logs
 logs

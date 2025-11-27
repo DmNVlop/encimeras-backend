@@ -28,6 +28,19 @@ export class AddonsService {
         return addon;
     }
 
+    /**
+   * Busca un addon por su campo 'code' único.
+   * Este método es utilizado por el QuotesService para obtener la configuración de un addon.
+   * @param code - El código único del addon (ej. 'CLADDING', 'COVING_ML').
+   */
+    async findByCode(code: string): Promise<Addon> {
+        const addon = await this.addonModel.findOne({ code }).exec();
+        if (!addon) {
+            throw new NotFoundException(`Addon with code "${code}" not found`);
+        }
+        return addon;
+    }
+
     async update(id: string, updateAddonDto: UpdateAddonDto): Promise<Addon> {
         const updatedAddon = await this.addonModel
             .findByIdAndUpdate(id, updateAddonDto, { new: true })

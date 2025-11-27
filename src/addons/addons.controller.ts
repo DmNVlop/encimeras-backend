@@ -17,16 +17,8 @@ import { ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
 @Controller('addons')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
 export class AddonsController {
     constructor(private readonly addonsService: AddonsService) { }
-
-    @Post()
-    @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-    create(@Body() createAddonDto: CreateAddonDto) {
-        return this.addonsService.create(createAddonDto);
-    }
 
     @Get()
     findAll() {
@@ -38,12 +30,24 @@ export class AddonsController {
         return this.addonsService.findOne(id);
     }
 
+    @ApiBearerAuth()
+    @UseGuards(JwtAuthGuard)
+    @Post()
+    @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+    create(@Body() createAddonDto: CreateAddonDto) {
+        return this.addonsService.create(createAddonDto);
+    }
+
+    @ApiBearerAuth()
+    @UseGuards(JwtAuthGuard)
     @Patch(':id')
     @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
     update(@Param('id') id: string, @Body() updateAddonDto: UpdateAddonDto) {
         return this.addonsService.update(id, updateAddonDto);
     }
 
+    @ApiBearerAuth()
+    @UseGuards(JwtAuthGuard)
     @Delete(':id')
     remove(@Param('id') id: string) {
         return this.addonsService.remove(id);

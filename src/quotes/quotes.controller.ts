@@ -16,7 +16,7 @@ export class QuotesController {
   @ApiOperation({ summary: 'Calculate a quote price in real-time' })
   @UsePipes(ValidationPipe)
   calculatePrice(@Body() calculateQuoteDto: CalculateQuoteDto) {
-    return this.quotesService.calculatePrice(calculateQuoteDto);
+    return this.quotesService.calculate(calculateQuoteDto);
   }
 
   @Post()
