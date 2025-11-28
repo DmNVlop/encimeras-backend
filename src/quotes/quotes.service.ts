@@ -36,11 +36,11 @@ export class QuotesService {
     let totalProjectPoints = 0;
     const piecesBreakdown: any[] = [];
 
-    // Iteramos sobre cada tramo (MainPiece)
+    // Iteramos sobre cada pieza principal (MainPiece)
     for (const [index, piece] of calculateQuoteDto.mainPieces.entries()) {
       let pieceSubtotal = 0;
       const pieceDetail: any = {
-        pieceName: `Tramo ${index + 1}`,
+        pieceName: `Pieza ${index + 1}`,
         basePricePoints: 0,
         addons: [],
         subtotalPoints: 0,
