@@ -3,9 +3,9 @@ import * as mongoose from "mongoose";
 import { Material } from "src/materials/schemas/material.schema";
 import { Quote } from "src/quotes/schemas/quote.schema";
 
-// --- Subdocumento para los Accesorios Aplicados a un Tramo ---
+// --- Subdocumento para los Accesorios Aplicados a una Pieza ---
 // Representa la instancia de un accesorio (e.g., 'Aplacado' o 'Copete')
-// con sus medidas específicas para este tramo.
+// con sus medidas específicas para esta pieza.
 @Schema({ _id: false })
 export class AppliedAddon {
   @Prop({ required: true, trim: true })
@@ -22,7 +22,7 @@ export class AppliedAddon {
 }
 const AppliedAddonSchema = SchemaFactory.createForClass(AppliedAddon);
 
-// --- Documento Principal: El Tramo de Encimera ---
+// --- Documento Principal: La Pieza Principal ---
 @Schema({ timestamps: true })
 export class MainPiece {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: "Quote" })
@@ -35,7 +35,7 @@ export class MainPiece {
   })
   materialId: Material;
 
-  // Guarda la selección completa del usuario para este tramo.
+  // Guarda la selección completa del usuario para esta pieza.
   // e.g., { MAT_GROUP: 'Basic', MAT_THICKNESS: '20mm', ... }
   @Prop({ type: Object, required: true })
   selectedAttributes: Record<string, string>;

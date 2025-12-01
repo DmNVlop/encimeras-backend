@@ -23,13 +23,13 @@ class AppliedAddonDto {
   quantity?: number;
 }
 
-// 2. DTO para cada Tramo (Pieza Principal)
+// 2. DTO para cada Pieza Principal
 class MainPieceDto {
   @ApiProperty({ description: "ID temporal del frontend (opcional)", required: false })
   @IsOptional()
   id?: string;
 
-  @ApiProperty({ description: "ID del Material seleccionado para este tramo" })
+  @ApiProperty({ description: "ID del Material seleccionado para esta pieza" })
   @IsMongoId()
   materialId: string;
 
@@ -45,7 +45,7 @@ class MainPieceDto {
   @IsNumber()
   width_mm: number;
 
-  @ApiProperty({ description: "Lista de accesorios aplicados a este tramo" })
+  @ApiProperty({ description: "Lista de accesorios aplicados a esta pieza" })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => AppliedAddonDto)
@@ -55,7 +55,7 @@ class MainPieceDto {
 
 // 3. DTO Principal de Cálculo
 export class CalculateQuoteDto {
-  @ApiProperty({ description: "Lista de tramos que componen el proyecto" })
+  @ApiProperty({ description: "Lista de piezas principales que componen el proyecto" })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => MainPieceDto)
