@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { IStorageStrategy } from "../interfaces/storage-strategy.interface";
 import * as fs from "fs/promises";
 import * as path from "path";
@@ -7,7 +8,7 @@ import * as path from "path";
 export class LocalStorageStrategy implements IStorageStrategy {
   private readonly uploadPath = "./public/uploads"; // O donde sirvas tus estáticos
 
-  constructor() {
+  constructor(private readonly configService: ConfigService) {
     // Asegurar que la carpeta existe al iniciar
     this.ensureDirectoryExists();
   }
