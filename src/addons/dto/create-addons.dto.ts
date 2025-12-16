@@ -20,7 +20,7 @@ export class CreateAddonDto {
   allowedMaterialCategories: string[];
 
   @IsArray()
-  @IsEnum(["quantity", "length_ml", "width_mm", "height_mm"], { each: true })
+  @IsEnum(["quantity", "length_ml", "width_mm", "height_mm", "radio_mm"], { each: true })
   @IsNotEmpty()
   requiredMeasurements: string[];
 

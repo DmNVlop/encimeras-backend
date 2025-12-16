@@ -30,7 +30,7 @@ export class Addon {
   @Prop({
     type: [String],
     required: true,
-    enum: ["quantity", "length_ml", "width_mm", "height_mm"],
+    enum: ["quantity", "length_ml", "width_mm", "height_mm", "radio_mm"],
     default: ["quantity"],
   })
   requiredMeasurements: string[];
