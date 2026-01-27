@@ -15,35 +15,76 @@ export class MaterialsService {
     return createdMaterial.save();
   }
 
-  async findAll() {
-    // Usamos el pipeline de agregación para unir colecciones y contar
+  async findAll(fields?: string) {
+    // 1. Construir la etapa de proyección dinámicamente
+    let projectStage: Record<string, any> = {
+      combinations: 0, // Default: Si no piden campos, devolvemos todo MENOS el array pesado
+    };
+
+    if (fields) {
+      // Si el usuario pide campos (ej: "name,category"), cambiamos a modo "Lista Blanca" (Inclusión)
+      projectStage = fields.split(",").reduce((acc, field) => {
+        acc[field.trim()] = 1; // { name: 1, category: 1 }
+        return acc;
+      }, {});
+
+      // NOTA: Al usar inclusiones explícitas ({name:1}), Mongo excluye automáticamente el resto,
+      // por lo que no hace falta poner combinations: 0 aquí.
+    }
+
+    // 2. Ejecutar el pipeline
     return this.materialModel
       .aggregate([
         {
-          // 1. "Left Join" a la colección de combinaciones válidas
-          // El nombre 'validcombinations' debe coincidir con el nombre de tu colección en MongoDB (plural y en minúsculas)
           $lookup: {
             from: "validcombinations",
             localField: "_id",
             foreignField: "materialId",
-            as: "combinations", // Nombre temporal del array con las combinaciones encontradas
+            as: "combinations",
           },
         },
         {
-          // 2. Añadimos el nuevo campo con el contador
           $addFields: {
-            validCombinationsCount: { $size: "$combinations" }, // Usamos $size para contar los elementos del array
+            validCombinationsCount: { $size: "$combinations" },
           },
         },
         {
-          // 3. Proyectamos los campos finales para limpiar la respuesta
-          $project: {
-            combinations: 0, // Eliminamos el array temporal que ya no necesitamos
-          },
+          // 3. Inyectamos nuestra proyección dinámica aquí
+          $project: projectStage,
         },
       ])
       .exec();
   }
+
+  // async findAll(fields?: string) {
+  //   // Usamos el pipeline de agregación para unir colecciones y contar
+  //   return this.materialModel
+  //     .aggregate([
+  //       {
+  //         // 1. "Left Join" a la colección de combinaciones válidas
+  //         // El nombre 'validcombinations' debe coincidir con el nombre de tu colección en MongoDB (plural y en minúsculas)
+  //         $lookup: {
+  //           from: "validcombinations",
+  //           localField: "_id",
+  //           foreignField: "materialId",
+  //           as: "combinations", // Nombre temporal del array con las combinaciones encontradas
+  //         },
+  //       },
+  //       {
+  //         // 2. Añadimos el nuevo campo con el contador
+  //         $addFields: {
+  //           validCombinationsCount: { $size: "$combinations" }, // Usamos $size para contar los elementos del array
+  //         },
+  //       },
+  //       {
+  //         // 3. Proyectamos los campos finales para limpiar la respuesta
+  //         $project: {
+  //           combinations: 0, // Eliminamos el array temporal que ya no necesitamos
+  //         },
+  //       },
+  //     ])
+  //     .exec();
+  // }
 
   async findOne(id: string): Promise<Material> {
     const material = await this.materialModel.findById(id).exec();
