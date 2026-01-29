@@ -13,7 +13,6 @@ export class AuthService {
 
   async validateUser(username: string, pass: string): Promise<any> {
     const user = await this.usersService.findOne(username);
-    console.log("1111 ", user);
 
     // Asumiendo que user ahora es un documento de Mongo
     if (user && (await bcrypt.compare(pass, user.password))) {
