@@ -20,14 +20,14 @@ export class UsersService {
       {
         userId: 1,
         name: "Admin",
-        username: "damian@prosolid3d.com",
+        username: "admin@admin.com",
         password: hashedPassword,
         roles: ["ADMIN"],
       },
       {
         userId: 2,
         name: "Usuario",
-        username: "dmnvlop@gmail.com",
+        username: "user@user.com",
         password: hashedPasswordUser,
         roles: ["USER"],
       },
