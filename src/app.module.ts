@@ -21,6 +21,9 @@ import { AddonsModule } from "./addons/addons.module";
 import { MainPiecesModule } from "./main-pieces/main-pieces.module";
 import { DictionariesModule } from "./dictionaries/dictionaries.module";
 import { AssetsModule } from "./assets/assets.module";
+import { DraftsModule } from "./drafts/drafts.module";
+import { OrdersModule } from "./orders/orders.module";
+import { UsersModule } from "./users/users.module";
 
 @Module({
   imports: [
@@ -58,6 +61,9 @@ import { AssetsModule } from "./assets/assets.module";
     MainPiecesModule,
     DictionariesModule,
     AssetsModule,
+    DraftsModule,
+    OrdersModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
