@@ -20,5 +20,6 @@ import { MainPiecesModule } from "src/main-pieces/main-pieces.module";
   ],
   controllers: [QuotesController],
   providers: [QuotesService],
+  exports: [QuotesService],
 })
 export class QuotesModule {}
