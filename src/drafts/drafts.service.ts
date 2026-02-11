@@ -35,10 +35,27 @@ export class DraftsService {
   }
 
   // --- RECUPERAR CON LÓGICA DE NEGOCIO ---
-  async findOne(id: string): Promise<any> {
+  async findOne(id: string, userId: string): Promise<any> {
+    // CAMBIO IMPORTANTE: Buscamos solo por ID primero para diagnosticar mejor
+    // y para permitir que un usuario reclame un borrador anónimo
     const draft = await this.draftModel.findById(id);
-    if (!draft) throw new NotFoundException(`Borrador ${id} no encontrado`);
-    if (draft.isConverted) throw new NotFoundException(`Este borrador ya fue procesado como orden`);
+
+    if (!draft) {
+      throw new NotFoundException(`Borrador ${id} no encontrado`);
+    }
+
+    if (draft.isConverted) {
+      throw new NotFoundException(`Este borrador ya fue procesado como orden`);
+    }
+
+    // VALIDACIÓN DE PROPIEDAD:
+    // 1. Si el borrador TIENE userId, debe coincidir con el que solicita
+    // 2. Si el borrador NO TIENE userId (es anónimo), permitimos que pase (se reclamará al convertir)
+    // CORRECCIÓN: Forzamos la comparación como Strings porque pueden venir como number o ObjectId
+    if (draft.userId && String(draft.userId) !== String(userId)) {
+      // Seguridad: Si no es tuyo, decimos que no existe
+      throw new NotFoundException(`Borrador no encontrado o no pertenece al usuario`);
+    }
 
     const now = new Date();
 
@@ -57,7 +74,6 @@ export class DraftsService {
     });
 
     // Actualizamos el precio en el borrador (pero no la fecha, sigue expirado hasta que el usuario guarde de nuevo)
-    // Esto es opcional: podrías solo devolverlo sin guardar, pero guardar ayuda a la trazabilidad.
     draft.currentPricePoints = calculation.totalPoints;
     await draft.save();
 
@@ -69,15 +85,15 @@ export class DraftsService {
     };
   }
 
-  async update(id: string, updateDraftDto: CreateDraftDto): Promise<Draft> {
+  async update(id: string, updateDraftDto: CreateDraftDto, userId: string): Promise<Draft> {
     const validityDays = await this.settingsService.getDraftValidityDays();
 
     // Al actualizar, renovamos la validez por N días más desde hoy
     const newExpirationDate = new Date();
     newExpirationDate.setDate(newExpirationDate.getDate() + validityDays);
 
-    const updatedDraft = await this.draftModel.findByIdAndUpdate(
-      id,
+    const updatedDraft = await this.draftModel.findOneAndUpdate(
+      { _id: id, userId },
       {
         ...updateDraftDto,
         expirationDate: newExpirationDate,
@@ -94,5 +110,9 @@ export class DraftsService {
 
   async markAsConverted(id: string): Promise<void> {
     await this.draftModel.findByIdAndUpdate(id, { isConverted: true });
+  }
+
+  async findAllActive(userId: string): Promise<Draft[]> {
+    return this.draftModel.find({ userId, isConverted: false }).lean().exec() as any;
   }
 }

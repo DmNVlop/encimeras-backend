@@ -17,16 +17,20 @@ export class OrdersController {
   @Post()
   @Roles(Role.USER, Role.SALES, Role.ADMIN)
   async convertToOrder(@Body() createOrderDto: CreateOrderDto, @Request() req) {
-    console.log("🚀 ~ OrdersController ~ convertToOrder ~ req.user:", req.user);
     // Sobrescribimos el customerId con el usuario real del token para evitar fraudes
-    // (Que yo haga un pedido diciendo que soy Damian Vidal)
-    const userIdDelToken = req.user.username || req.user.userId;
+    // - userId: ID de Mongo del usuario (para verificar propiedad del borrador)
+    // - customerId: Email/Username visible (para guardar en el header de la orden)
+    const userId = req.user.userId;
+    const customerIdentifier = req.user.username || req.user.email || req.user.userId;
 
     // Este endpoint "quema" el borrador y crea la orden con el Shared-Header
-    const order = await this.ordersService.createFromDraft({
-      ...createOrderDto,
-      customerId: userIdDelToken,
-    });
+    const order = await this.ordersService.createFromDraft(
+      {
+        ...createOrderDto,
+        customerId: customerIdentifier,
+      },
+      userId,
+    );
     return {
       message: "Orden generada con éxito",
       orderNumber: order.header.orderNumber,
@@ -36,7 +40,7 @@ export class OrdersController {
 
   // 2. Ver todas las órdenes: Solo Admin y Ventas
   @Get()
-  @Roles(Role.ADMIN, Role.SALES)
+  @Roles(Role.ADMIN, Role.SALES, Role.USER)
   async listAll(@Query("status") status?: string) {
     // Endpoint para el Admin Panel
     // Solo devuelve los Headers para optimizar la carga del DataGrid [cite: 29]
@@ -45,13 +49,14 @@ export class OrdersController {
 
   // 3. Aprobar Orden: SOLO Admin (o Ventas si decides darle poder)
   @Get(":id")
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.SALES, Role.USER)
   async getDetail(@Param("id") id: string) {
     // Devuelve la orden completa incluyendo el TechnicalSnapshot para producción
     return this.ordersService.findOne(id);
   }
 
   @Patch(":id/status")
+  @Roles(Role.ADMIN, Role.SALES, Role.USER)
   async updateStatus(@Param("id") id: string, @Body() updateOrderStatusDto: UpdateOrderStatusDto) {
     return this.ordersService.updateStatus(id, updateOrderStatusDto.status);
   }
