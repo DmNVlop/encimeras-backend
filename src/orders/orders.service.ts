@@ -42,10 +42,11 @@ export class OrdersService {
     return order as Order;
   }
 
-  async createFromDraft(createOrderDto: CreateOrderDto): Promise<Order> {
+  async createFromDraft(createOrderDto: CreateOrderDto, userId: string): Promise<Order> {
     // 1. Recuperar el Borrador
     // Nota: Usamos findOne del servicio para asegurar que se recalculó si estaba expirado
-    const draftResult = await this.draftsService.findOne(createOrderDto.draftId);
+    // CORRECCIÓN: Usamos userId (Mongo ID) para verificar propiedad, NO el customerId (Email)
+    const draftResult = await this.draftsService.findOne(createOrderDto.draftId, userId);
     const draft = draftResult.data;
 
     // 2. Validaciones de Integridad
