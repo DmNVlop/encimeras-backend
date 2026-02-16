@@ -54,11 +54,14 @@ export class QuotesService {
       // B. Precio de Accesorios (Addons)
       if (piece.appliedAddons && piece.appliedAddons.length > 0) {
         for (const addon of piece.appliedAddons) {
-          const addonPrice = await this.calculateAddonPrice(addon, piece);
+          const addonMaster = await this.addonsService.findByCode(addon.code);
+          const addonPrice = await this.calculateAddonPrice(addon, piece, addonMaster);
           pieceSubtotal += addonPrice;
 
           pieceDetail.addons.push({
             addonName: addon.code, // Idealmente buscar el nombre real en DB, pero por performance usamos code o lo traemos del servicio
+            name: addonMaster.name,
+            imageUrl: addonMaster.imageUrl,
             pricePoints: addonPrice,
           });
         }
@@ -147,15 +150,17 @@ export class QuotesService {
     const priceConfig = await this.priceConfigsService.findPriceForCombination(productType, combinationKey);
 
     // 4. Calcular superficie (m2)
-    // Convertimos mm a m
-    const areaM2 = (piece.length_mm / 1000) * (piece.width_mm / 1000);
+    // Convertimos mm a m, asegurando valores numéricos
+    const lengthM = (piece.length_mm || 0) / 1000;
+    const widthM = (piece.width_mm || 0) / 1000;
+    const areaM2 = lengthM * widthM;
 
     return priceConfig.price * areaM2;
   }
 
-  private async calculateAddonPrice(addon: AppliedAddonData, piece: MainPieceData): Promise<number> {
-    // Buscamos por 'code'
-    const addonMaster = await this.addonsService.findByCode(addon.code);
+  private async calculateAddonPrice(addon: AppliedAddonData, piece: MainPieceData, addonMaster: Addon): Promise<number> {
+    // Buscamos por 'code' -> YA NO NECESARIO AQUÍ
+    // const addonMaster = await this.addonsService.findByCode(addon.code);
 
     switch (addonMaster.pricingType) {
       case "FIXED":
@@ -218,10 +223,11 @@ export class QuotesService {
     if (range.priceType === "ml" && addon.measurements?.length_ml) {
       return priceConfig.price * addon.measurements.length_ml;
     }
-    if (range.priceType === "m2" && addon.measurements?.length_ml) {
+    if (range.priceType === "m2") {
       // Si es m2, multiplicamos largo x alto (convertido a metros)
       const heightM = rangeValue / 1000;
-      return priceConfig.price * (addon.measurements.length_ml * heightM);
+      const lengthM = addon.measurements?.length_ml || 0;
+      return priceConfig.price * (lengthM * heightM);
     }
 
     // Default a precio por pieza
@@ -244,7 +250,7 @@ export class QuotesService {
     // Normalmente esto se cobra por m2 (Aplacado)
     if (recipe.unit === "m2") {
       // Buscamos medidas de superficie
-      const l = addon.measurements?.length_ml || piece.length_mm / 1000; // Fallback al largo de pieza
+      const l = addon.measurements?.length_ml || (piece.length_mm || 0) / 1000; // Fallback al largo de pieza
       const w = (addon.measurements?.height_mm || addon.measurements?.width_mm || 0) / 1000;
 
       if (l && w) {

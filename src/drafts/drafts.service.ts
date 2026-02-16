@@ -74,14 +74,15 @@ export class DraftsService {
     });
 
     // Actualizamos el precio en el borrador (pero no la fecha, sigue expirado hasta que el usuario guarde de nuevo)
-    draft.currentPricePoints = calculation.totalPoints;
+    const safePoints = Number.isFinite(calculation.totalPoints) ? calculation.totalPoints : 0;
+    draft.currentPricePoints = safePoints;
     await draft.save();
 
     return {
       status: "EXPIRED_RECALCULATED",
       message: "El presupuesto ha caducado. Los precios se han actualizado a la tarifa vigente.",
       data: draft,
-      newPrice: calculation.totalPoints,
+      newPrice: safePoints,
     };
   }
 
@@ -114,5 +115,12 @@ export class DraftsService {
 
   async findAllActive(userId: string): Promise<Draft[]> {
     return this.draftModel.find({ userId, isConverted: false }).lean().exec() as any;
+  }
+
+  async delete(id: string, userId: string): Promise<void> {
+    const result = await this.draftModel.deleteOne({ _id: id, userId });
+    if (result.deletedCount === 0) {
+      throw new NotFoundException(`Draft with ID "${id}" not found or does not belong to user`);
+    }
   }
 }
