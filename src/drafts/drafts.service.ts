@@ -74,14 +74,15 @@ export class DraftsService {
     });
 
     // Actualizamos el precio en el borrador (pero no la fecha, sigue expirado hasta que el usuario guarde de nuevo)
-    draft.currentPricePoints = calculation.totalPoints;
+    const safePoints = Number.isFinite(calculation.totalPoints) ? calculation.totalPoints : 0;
+    draft.currentPricePoints = safePoints;
     await draft.save();
 
     return {
       status: "EXPIRED_RECALCULATED",
       message: "El presupuesto ha caducado. Los precios se han actualizado a la tarifa vigente.",
       data: draft,
-      newPrice: calculation.totalPoints,
+      newPrice: safePoints,
     };
   }
 
