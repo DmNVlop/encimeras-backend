@@ -116,4 +116,11 @@ export class DraftsService {
   async findAllActive(userId: string): Promise<Draft[]> {
     return this.draftModel.find({ userId, isConverted: false }).lean().exec() as any;
   }
+
+  async delete(id: string, userId: string): Promise<void> {
+    const result = await this.draftModel.deleteOne({ _id: id, userId });
+    if (result.deletedCount === 0) {
+      throw new NotFoundException(`Draft with ID "${id}" not found or does not belong to user`);
+    }
+  }
 }

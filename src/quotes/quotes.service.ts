@@ -54,11 +54,14 @@ export class QuotesService {
       // B. Precio de Accesorios (Addons)
       if (piece.appliedAddons && piece.appliedAddons.length > 0) {
         for (const addon of piece.appliedAddons) {
-          const addonPrice = await this.calculateAddonPrice(addon, piece);
+          const addonMaster = await this.addonsService.findByCode(addon.code);
+          const addonPrice = await this.calculateAddonPrice(addon, piece, addonMaster);
           pieceSubtotal += addonPrice;
 
           pieceDetail.addons.push({
             addonName: addon.code, // Idealmente buscar el nombre real en DB, pero por performance usamos code o lo traemos del servicio
+            name: addonMaster.name,
+            imageUrl: addonMaster.imageUrl,
             pricePoints: addonPrice,
           });
         }
@@ -155,9 +158,9 @@ export class QuotesService {
     return priceConfig.price * areaM2;
   }
 
-  private async calculateAddonPrice(addon: AppliedAddonData, piece: MainPieceData): Promise<number> {
-    // Buscamos por 'code'
-    const addonMaster = await this.addonsService.findByCode(addon.code);
+  private async calculateAddonPrice(addon: AppliedAddonData, piece: MainPieceData, addonMaster: Addon): Promise<number> {
+    // Buscamos por 'code' -> YA NO NECESARIO AQUÍ
+    // const addonMaster = await this.addonsService.findByCode(addon.code);
 
     switch (addonMaster.pricingType) {
       case "FIXED":

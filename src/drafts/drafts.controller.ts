@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, HttpStatus, Res, Put, UseGuards } from "@nestjs/common";
+import { Controller, Post, Get, Body, Param, HttpStatus, Res, Put, UseGuards, Delete } from "@nestjs/common";
 import { DraftsService } from "./drafts.service";
 import { CreateDraftDto } from "./dto/create-draft.dto";
 import type { Response } from "express";
@@ -53,6 +53,15 @@ export class DraftsController {
       message: "Borrador actualizado con éxito",
       id: draft._id,
       expirationDate: draft.expirationDate,
+    };
+  }
+
+  @Delete(":id")
+  @UseGuards(JwtAuthGuard)
+  async delete(@Param("id") id: string, @GetUser() user: any) {
+    await this.draftsService.delete(id, user.userId);
+    return {
+      message: "Borrador eliminado correctamente",
     };
   }
 }
