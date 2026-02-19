@@ -38,9 +38,13 @@ export class QuotesService {
 
     // Iteramos sobre cada pieza principal (MainPiece)
     for (const [index, piece] of calculateQuoteDto.mainPieces.entries()) {
+      const material = await this.materialsService.findOne(piece.materialId);
+
       let pieceSubtotal = 0;
       const pieceDetail: any = {
         pieceName: `Pieza ${index + 1}`,
+        materialId: piece.materialId,
+        materialName: material?.name || "Desconocido",
         basePricePoints: 0,
         addons: [],
         subtotalPoints: 0,
