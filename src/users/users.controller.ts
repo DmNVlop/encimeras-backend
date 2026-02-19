@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, HttpStatus } from "@nestjs/common";
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, ForbiddenException } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
 import { UsersService } from "./users.service";
 import { CreateUserDto } from "./dto/create-user.dto";
@@ -32,21 +32,39 @@ export class UsersController {
     return this.usersService.findAll();
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.USER, Role.SALES, Role.WORKER)
   @Get(":id")
-  @ApiOperation({ summary: "Obtener un usuario por ID (Solo Admin)" })
+  @ApiOperation({ summary: "Obtener un usuario por ID (Admin o propio usuario)" })
   @ApiResponse({ status: 200, description: "Usuario encontrado." })
+  @ApiResponse({ status: 403, description: "Prohibido (cuando no es admin ni es el propio usuario)." })
   @ApiResponse({ status: 404, description: "Usuario no encontrado." })
-  findOne(@Param("id") id: string) {
+  findOne(@Param("id") id: string, @Req() req: any) {
+    const user = req.user;
+    if (!user.roles.includes(Role.ADMIN) && user.userId !== id) {
+      throw new ForbiddenException("No tienes permiso para ver este perfil");
+    }
     return this.usersService.findOne(id);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.USER, Role.SALES, Role.WORKER)
   @Patch(":id")
-  @ApiOperation({ summary: "Actualizar un usuario (Solo Admin)" })
+  @ApiOperation({ summary: "Actualizar un usuario (Admin o propio usuario)" })
   @ApiResponse({ status: 200, description: "Usuario actualizado." })
+  @ApiResponse({ status: 403, description: "Prohibido (cuando no es admin ni es el propio usuario)." })
   @ApiResponse({ status: 404, description: "Usuario no encontrado." })
-  update(@Param("id") id: string, @Body() updateUserDto: UpdateUserDto) {
+  update(@Param("id") id: string, @Body() updateUserDto: UpdateUserDto, @Req() req: any) {
+    const user = req.user;
+
+    // Si no es ADMIN, solo puede actualizarse a sí mismo
+    if (!user.roles.includes(Role.ADMIN) && user.userId !== id) {
+      throw new ForbiddenException("No tienes permiso para actualizar este usuario");
+    }
+
+    // Si no es ADMIN, no permitimos que cambie sus propios roles
+    if (!user.roles.includes(Role.ADMIN) && updateUserDto.roles) {
+      delete updateUserDto.roles;
+    }
+
     return this.usersService.update(id, updateUserDto);
   }
 
