@@ -1,6 +1,6 @@
 // src/auth/auth.service.ts
 import { Injectable } from "@nestjs/common";
-import { UsersService } from "./users.service";
+import { UsersService } from "../users/users.service";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
 
@@ -12,41 +12,38 @@ export class AuthService {
   ) {}
 
   async validateUser(username: string, pass: string): Promise<any> {
-    const user = await this.usersService.findOne(username);
+    const user = await this.usersService.findByUsername(username);
 
-    // Asumiendo que user ahora es un documento de Mongo
     if (user && (await bcrypt.compare(pass, user.password))) {
-      const { password, ...result } = user;
+      const userObj = user.toObject();
+      const { password, ...result } = userObj;
       return result;
     }
     return null;
   }
 
   async login(user: any) {
-    // 🔥 CLAVE: Incluimos el rol en el payload del token
     const payload = {
       name: user.name,
       username: user.username,
-      userId: user.userId,
+      sub: user._id, // Usamos _id de Mongo como sub
       roles: user.roles,
     };
 
     return {
       access_token: this.jwtService.sign(payload),
-      // Devolvemos también el usuario (sin pass) para que el Front decida la redirección inicial
       user: {
+        id: user._id,
         name: user.name,
         username: user.username,
-        userId: user.userId,
         roles: user.roles,
       },
     };
   }
 
-  async getProfile(userId: number) {
-    const user = await this.usersService.findById(userId);
+  async getProfile(userId: string) {
+    const user = await this.usersService.findOne(userId);
     if (!user) return null;
-    const { password, ...result } = user;
-    return result;
+    return user; // El service ya hace el select('-password')
   }
 }

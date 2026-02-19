@@ -1,18 +1,14 @@
 import { Module } from "@nestjs/common";
 import { MongooseModule } from "@nestjs/mongoose";
 import { User, UsersSchema } from "./schemas/users.schema";
-import { UsersService } from "src/auth/users.service";
+import { UsersService } from "./users.service";
 import { SeedService } from "src/database/seed.service";
+import { UsersController } from "./users.controller";
 
 @Module({
-  imports: [
-    // 1. Aquí es donde se crea el "UserModel" que SeedService necesita
-    MongooseModule.forFeature([{ name: User.name, schema: UsersSchema }]),
-  ],
-  providers: [
-    UsersService,
-    SeedService, // 2. Registramos el SeedService AQUÍ, donde tiene acceso al modelo
-  ],
-  exports: [UsersService], // No hace falta exportar SeedService si solo se ejecuta al inicio
+  imports: [MongooseModule.forFeature([{ name: User.name, schema: UsersSchema }])],
+  controllers: [UsersController],
+  providers: [UsersService, SeedService],
+  exports: [UsersService],
 })
 export class UsersModule {}
