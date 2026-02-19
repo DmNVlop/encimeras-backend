@@ -17,12 +17,18 @@ export class AnalyticsService {
     const { startDate, endDate, status, factoryId } = query;
 
     const dateFilter: any = {};
-    if (startDate || endDate) {
-      dateFilter.$gte = startDate ? new Date(startDate) : new Date(0);
-      dateFilter.$lte = endDate ? new Date(endDate) : new Date();
+
+    // Si no hay fecha de inicio, por defecto usamos los últimos 30 días
+    if (!startDate) {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      dateFilter.$gte = thirtyDaysAgo;
+    } else {
+      dateFilter.$gte = new Date(startDate);
     }
 
-    // Definir qué colecciones consultar
+    if (endDate) dateFilter.$lte = new Date(endDate);
+
     const results: any = {
       summary: { totalQuotes: 0, totalPoints: 0, avgPointsPerProject: 0, totalSqm: 0, totalMl: 0, avgPiecesPerProject: 0 },
       charts: { materials: [], shapes: [], addons: [] },
@@ -55,8 +61,13 @@ export class AnalyticsService {
   }
 
   private async aggregateOrders(dateFilter: any, factoryId?: string) {
-    const match: any = { "header.orderDate": dateFilter };
-    // if (factoryId) match['header.factoryId'] = factoryId; // Add when factoryId is available
+    const match: any = {};
+    if (Object.keys(dateFilter).length > 0) {
+      match["header.orderDate"] = dateFilter;
+    }
+    if (factoryId) {
+      match["header.factoryId"] = factoryId;
+    }
 
     return this.orderModel.aggregate([
       { $match: match },
@@ -147,7 +158,12 @@ export class AnalyticsService {
   }
 
   private async aggregateDrafts(dateFilter: any, factoryId?: string) {
-    const match: any = { createdAt: dateFilter }; // Drafts use timestamps (createdAt)
+    const match: any = {};
+    if (Object.keys(dateFilter).length > 0) {
+      match.createdAt = dateFilter;
+    }
+    // Si los drafts tuvieran factoryId, se añadiría aquí
+    // if (factoryId) match['configuration.factoryId'] = factoryId;
 
     return this.draftModel.aggregate([
       { $match: match },
