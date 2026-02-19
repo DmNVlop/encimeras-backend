@@ -25,6 +25,8 @@ import { DraftsModule } from "./drafts/drafts.module";
 import { OrdersModule } from "./orders/orders.module";
 import { UsersModule } from "./users/users.module";
 
+import { AnalyticsModule } from "./analytics/analytics.module";
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -64,6 +66,7 @@ import { UsersModule } from "./users/users.module";
     DraftsModule,
     OrdersModule,
     UsersModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
