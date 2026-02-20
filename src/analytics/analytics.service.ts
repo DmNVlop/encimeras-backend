@@ -17,6 +17,7 @@ export class AnalyticsService {
     const { startDate, endDate, status, factoryId } = query;
 
     const dateFilter: any = {};
+    const effectiveStatus = status || AnalyticsStatus.ALL;
 
     // Si no hay fecha de inicio, por defecto usamos los últimos 30 días
     if (!startDate) {
@@ -35,12 +36,12 @@ export class AnalyticsService {
       trends: { dailyQuotes: [] },
     };
 
-    if (status === AnalyticsStatus.ORDER || status === AnalyticsStatus.ALL) {
+    if (effectiveStatus === AnalyticsStatus.ORDER || effectiveStatus === AnalyticsStatus.ALL) {
       const orderResults = await this.aggregateOrders(dateFilter, factoryId);
       this.mergeResults(results, orderResults);
     }
 
-    if (status === AnalyticsStatus.DRAFT || status === AnalyticsStatus.ALL) {
+    if (effectiveStatus === AnalyticsStatus.DRAFT || effectiveStatus === AnalyticsStatus.ALL) {
       const draftResults = await this.aggregateDrafts(dateFilter, factoryId);
       this.mergeResults(results, draftResults);
     }
@@ -77,8 +78,18 @@ export class AnalyticsService {
             {
               $project: {
                 totalPoints: "$header.totalPoints",
-                pieces: { $arrayElemAt: ["$items.technicalSnapshot.pieces", 0] },
-                numPieces: { $size: { $ifNull: [{ $arrayElemAt: ["$items.technicalSnapshot.pieces", 0] }, []] } },
+                pieces: {
+                  $reduce: {
+                    input: "$items",
+                    initialValue: [],
+                    in: { $concatArrays: ["$$value", { $ifNull: ["$$this.technicalSnapshot.pieces", []] }] },
+                  },
+                },
+              },
+            },
+            {
+              $addFields: {
+                numPieces: { $size: "$pieces" },
               },
             },
             {
@@ -91,7 +102,7 @@ export class AnalyticsService {
                 numPieces: { $first: "$numPieces" },
                 projectSqm: {
                   $sum: {
-                    $divide: [{ $multiply: [{ $ifNull: ["$pieces.length_mm", 0] }, { $ifNull: ["$pieces.width_mm", 0] }] }, 1000000],
+                    $divide: [{ $multiply: [{ $ifNull: ["$pieces.measurements.length_mm", 0] }, { $ifNull: ["$pieces.measurements.width_mm", 0] }] }, 1000000],
                   },
                 },
                 projectMl: {
@@ -121,24 +132,39 @@ export class AnalyticsService {
             { $unwind: "$items.technicalSnapshot.materials" },
             {
               $group: {
-                _id: "$items.technicalSnapshot.materials.id",
-                name: { $first: "$items.technicalSnapshot.materials.name" },
+                _id: "$items.technicalSnapshot.materials.materialId",
+                name: { $first: "$items.technicalSnapshot.materials.materialName" },
                 count: { $sum: 1 },
               },
             },
-            { $project: { id: "$_id", name: 1, count: 1, _id: 0 } },
+            { $project: { id: "$_id", name: { $ifNull: ["$name", "Desconocido"] }, count: 1, _id: 0 } },
           ],
           addons: [
             { $unwind: "$items" },
-            { $unwind: { path: "$items.technicalSnapshot.addons", preserveNullAndEmptyArrays: true } },
             {
-              $group: {
-                _id: "$items.technicalSnapshot.addons.code",
-                label: { $first: "$items.technicalSnapshot.addons.name" }, // Or label if exists/available
-                count: { $sum: { $cond: [{ $ifNull: ["$items.technicalSnapshot.addons.code", false] }, 1, 0] } },
+              $project: {
+                allAddons: {
+                  $concatArrays: [
+                    { $ifNull: ["$items.technicalSnapshot.addons", []] },
+                    {
+                      $reduce: {
+                        input: { $ifNull: ["$items.technicalSnapshot.pieces", []] },
+                        initialValue: [],
+                        in: { $concatArrays: ["$$value", { $ifNull: ["$$this.appliedAddons", []] }] },
+                      },
+                    },
+                  ],
+                },
               },
             },
-            { $match: { _id: { $ne: null } } },
+            { $unwind: "$allAddons" },
+            {
+              $group: {
+                _id: "$allAddons.code",
+                label: { $first: "$allAddons.name" },
+                count: { $sum: 1 },
+              },
+            },
             { $project: { code: "$_id", label: { $ifNull: ["$label", "$_id"] }, count: 1, _id: 0 } },
           ],
           trends: [
@@ -187,7 +213,7 @@ export class AnalyticsService {
                 numPieces: { $first: "$numPieces" },
                 projectSqm: {
                   $sum: {
-                    $divide: [{ $multiply: [{ $ifNull: ["$pieces.length_mm", 0] }, { $ifNull: ["$pieces.width_mm", 0] }] }, 1000000],
+                    $divide: [{ $multiply: [{ $ifNull: ["$pieces.measurements.length_mm", 0] }, { $ifNull: ["$pieces.measurements.width_mm", 0] }] }, 1000000],
                   },
                 },
                 projectMl: {
@@ -215,25 +241,50 @@ export class AnalyticsService {
           materials: [
             {
               $group: {
-                _id: "$configuration.wizardTempMaterial.id",
-                name: { $first: "$configuration.wizardTempMaterial.name" },
+                _id: "$configuration.wizardTempMaterial.materialId",
+                name: { $first: "$configuration.wizardTempMaterial.materialName" },
                 count: { $sum: 1 },
               },
             },
             { $match: { _id: { $ne: null } } },
-            { $project: { id: "$_id", name: 1, count: 1, _id: 0 } },
+            { $project: { id: "$_id", name: { $ifNull: ["$name", "Desconocido"] }, count: 1, _id: 0 } },
           ],
           addons: [
-            { $unwind: { path: "$configuration.globalAddons", preserveNullAndEmptyArrays: true } },
+            {
+              $project: {
+                allAddons: {
+                  $concatArrays: [
+                    { $ifNull: ["$configuration.globalAddons", []] },
+                    {
+                      $reduce: {
+                        input: { $ifNull: ["$configuration.mainPieces", []] },
+                        initialValue: [],
+                        in: { $concatArrays: ["$$value", { $ifNull: ["$$this.appliedAddons", []] }] },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+            { $unwind: "$allAddons" },
             {
               $group: {
-                _id: "$configuration.globalAddons.code",
-                label: { $first: "$configuration.globalAddons.name" },
-                count: { $sum: { $cond: [{ $ifNull: ["$configuration.globalAddons.code", false] }, 1, 0] } },
+                _id: "$allAddons.code",
+                label: { $first: "$allAddons.name" },
+                count: { $sum: 1 },
+              },
+            },
+            { $project: { code: "$_id", label: { $ifNull: ["$label", "$_id"] }, count: 1, _id: 0 } },
+          ],
+          shapes: [
+            {
+              $group: {
+                _id: "$configuration.selectedShapeId",
+                count: { $sum: 1 },
               },
             },
             { $match: { _id: { $ne: null } } },
-            { $project: { code: "$_id", label: { $ifNull: ["$label", "$_id"] }, count: 1, _id: 0 } },
+            { $project: { id: "$_id", label: "$_id", value: "$count", _id: 0 } },
           ],
           trends: [
             {
@@ -282,6 +333,16 @@ export class AnalyticsService {
         existing.count += a.count;
       } else {
         target.charts.addons.push(a);
+      }
+    });
+
+    // Charts: Shapes
+    data.shapes?.forEach((s) => {
+      const existing = target.charts.shapes.find((x) => x.id === s.id);
+      if (existing) {
+        existing.value += s.value;
+      } else {
+        target.charts.shapes.push(s);
       }
     });
 
