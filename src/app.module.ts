@@ -31,6 +31,8 @@ import { CartModule } from "./cart/cart.module";
 
 import { AnalyticsModule } from "./analytics/analytics.module";
 
+import { RedisCheckService } from "./redis-check.service";
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -82,6 +84,6 @@ import { AnalyticsModule } from "./analytics/analytics.module";
     CartModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, RedisCheckService],
 })
 export class AppModule {}
