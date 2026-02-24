@@ -1,0 +1,23 @@
+export enum DiscountType {
+  PERCENTAGE = "PERCENTAGE",
+  FIXED_AMOUNT = "FIXED_AMOUNT",
+}
+
+export enum DiscountScope {
+  GLOBAL_TOTAL = "GLOBAL_TOTAL",
+  SPECIFIC_MATERIALS = "SPECIFIC_MATERIALS",
+  MATERIAL_CATEGORIES = "MATERIAL_CATEGORIES",
+}
+
+export enum CollisionStrategy {
+  SUM = "SUM",
+  MAX = "MAX",
+  MIN = "MIN",
+  CASCADE = "CASCADE",
+}
+
+export enum CustomerStrategy {
+  ALL = "ALL",
+  SPECIFIC_CUSTOMERS = "SPECIFIC_CUSTOMERS",
+  CUSTOMER_PROFILES = "CUSTOMER_PROFILES",
+}

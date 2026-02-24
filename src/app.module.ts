@@ -24,6 +24,8 @@ import { AssetsModule } from "./assets/assets.module";
 import { DraftsModule } from "./drafts/drafts.module";
 import { OrdersModule } from "./orders/orders.module";
 import { UsersModule } from "./users/users.module";
+import { CustomersModule } from "./customers/customers.module";
+import { DiscountRulesModule } from "./discount-rules/discount-rules.module";
 
 import { AnalyticsModule } from "./analytics/analytics.module";
 
@@ -67,6 +69,8 @@ import { AnalyticsModule } from "./analytics/analytics.module";
     OrdersModule,
     UsersModule,
     AnalyticsModule,
+    CustomersModule,
+    DiscountRulesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
