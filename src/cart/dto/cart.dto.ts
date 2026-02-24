@@ -8,9 +8,12 @@ export class AddToCartDto {
   @IsObject()
   @IsNotEmpty()
   configuration: {
-    materials: any[];
-    pieces: any[];
-    addons: any[];
+    wizardTempMaterial?: any;
+    selectedShapeId?: string;
+    mainPieces: any[];
+    materials?: any[];
+    addons?: any[];
+    [key: string]: any; // Allow for extensibility
   };
 
   @IsNumber()
@@ -30,12 +33,28 @@ export class UpdateCartItemDto {
   @IsObject()
   @IsOptional()
   configuration?: {
-    materials: any[];
-    pieces: any[];
-    addons: any[];
+    wizardTempMaterial?: any;
+    selectedShapeId?: string;
+    mainPieces?: any[];
+    materials?: any[];
+    addons?: any[];
+    [key: string]: any;
   };
 
   @IsNumber()
   @IsOptional()
   subtotalPoints?: number;
+}
+
+export class RemoveItemsDto {
+  @IsArray()
+  @IsString({ each: true })
+  @IsNotEmpty()
+  ids: string[];
+}
+
+export class ImportGroupDto {
+  @IsOptional()
+  @IsNotEmpty()
+  clearFirst?: boolean;
 }

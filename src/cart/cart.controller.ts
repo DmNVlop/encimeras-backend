@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Param, Delete, Put, UseGuards, Req } from "@nestjs/common";
 import { CartService } from "./cart.service";
-import { AddToCartDto, UpdateCartItemDto } from "./dto/cart.dto";
+import { AddToCartDto, UpdateCartItemDto, RemoveItemsDto, ImportGroupDto } from "./dto/cart.dto";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 
@@ -42,6 +42,14 @@ export class CartController {
     return this.cartService.removeItem(req.user.userId, cartItemId);
   }
 
+  @Delete("items")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Eliminar múltiples ítems del carrito" })
+  async removeItems(@Req() req, @Body() removeDto: RemoveItemsDto) {
+    return this.cartService.removeItems(req.user.userId, removeDto.ids);
+  }
+
   @Post("save-as-drafts")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -56,5 +64,13 @@ export class CartController {
   @ApiOperation({ summary: "Iniciar el proceso de creación de orden desde el carrito (Asíncrono)" })
   async checkout(@Req() req) {
     return this.cartService.checkout(req.user.userId);
+  }
+
+  @Post("items/group/:groupId")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Importar todos los borradores de un grupo al carrito" })
+  async importByGroup(@Req() req, @Param("groupId") groupId: string, @Body() importDto: ImportGroupDto) {
+    return this.cartService.importByGroupId(req.user.userId, groupId, importDto.clearFirst);
   }
 }

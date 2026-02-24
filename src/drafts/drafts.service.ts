@@ -117,6 +117,10 @@ export class DraftsService {
     return this.draftModel.find({ userId, isConverted: false }).lean().exec() as any;
   }
 
+  async findAllByGroupId(groupId: string, userId: string): Promise<Draft[]> {
+    return this.draftModel.find({ cartGroupId: groupId, userId, isConverted: false }).lean().exec() as any;
+  }
+
   async delete(id: string, userId: string): Promise<void> {
     const result = await this.draftModel.deleteOne({ _id: id, userId });
     if (result.deletedCount === 0) {

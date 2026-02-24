@@ -74,11 +74,11 @@ export class OrdersService {
         {
           type: "COUNTERTOP_PROJECT",
           technicalSnapshot: {
-            // Copia profunda del estado del QuoteContext
-            materials: [draft.configuration.wizardTempMaterial],
-            pieces: draft.configuration.mainPieces,
-            // Asumiendo que guardaste addons globales o por pieza
-            addons: draft.configuration.globalAddons || [],
+            ...draft.configuration,
+            // Fallbacks for backward compatibility if needed
+            materials: draft.configuration.materials || [draft.configuration.wizardTempMaterial],
+            mainPieces: draft.configuration.mainPieces,
+            addons: draft.configuration.addons || draft.configuration.globalAddons || [],
           },
         },
       ],
@@ -150,9 +150,7 @@ export class OrdersService {
       type: "COUNTERTOP_PROJECT",
       cartItemName: item.customName, // Trazabilidad: "Cocina de Juana"
       technicalSnapshot: {
-        materials: item.technicalSnapshot.materials,
-        pieces: item.technicalSnapshot.pieces,
-        addons: item.technicalSnapshot.addons,
+        ...item.technicalSnapshot,
       },
     }));
 

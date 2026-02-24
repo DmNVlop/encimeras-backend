@@ -47,7 +47,7 @@ export class CartService {
     // 1. Validamos el precio antes de añadir (Seguridad Backend)
     // Recalculamos usando el motor oficial para evitar fraudes desde el frontend
     const calculation = await this.quotesService.calculate({
-      mainPieces: addToCartDto.configuration.pieces,
+      mainPieces: addToCartDto.configuration.mainPieces,
       // Podríamos pasar factoryId si fuera necesario para descuentos
       customerId: customerId,
     });
@@ -80,6 +80,19 @@ export class CartService {
   }
 
   /**
+   * Elimina múltiples ítems del carrito
+   */
+  async removeItems(customerId: string, cartItemIds: string[]): Promise<CartDocument> {
+    const cart = await this.cartModel.findOne({ customerId, status: "ACTIVE" }).exec();
+    if (!cart) throw new NotFoundException("Carrito no encontrado");
+
+    cart.items = cart.items.filter((item) => !cartItemIds.includes(item.cartItemId));
+    this.calculateTotal(cart);
+
+    return cart.save();
+  }
+
+  /**
    * Actualiza un ítem del carrito
    */
   async updateItem(customerId: string, cartItemId: string, updateDto: UpdateCartItemDto): Promise<CartDocument> {
@@ -90,7 +103,12 @@ export class CartService {
     if (itemIndex === -1) throw new NotFoundException("Ítem no encontrado en el carrito");
 
     if (updateDto.customName) cart.items[itemIndex].customName = updateDto.customName;
-    if (updateDto.configuration) cart.items[itemIndex].technicalSnapshot = updateDto.configuration;
+    if (updateDto.configuration) {
+      cart.items[itemIndex].technicalSnapshot = {
+        ...cart.items[itemIndex].technicalSnapshot,
+        ...updateDto.configuration,
+      } as any;
+    }
     if (updateDto.subtotalPoints) cart.items[itemIndex].subtotalPoints = updateDto.subtotalPoints;
 
     this.calculateTotal(cart);
@@ -137,6 +155,43 @@ export class CartService {
       count: drafts.length,
       drafts,
     };
+  }
+
+  /**
+   * Importa todos los borradores de un grupo al carrito
+   */
+  async importByGroupId(customerId: string, groupId: string, clearFirst: boolean = false): Promise<CartDocument> {
+    const drafts = await this.draftsService.findAllByGroupId(groupId, customerId);
+    if (!drafts || drafts.length === 0) {
+      throw new NotFoundException(`No se encontraron borradores para el grupo ${groupId}`);
+    }
+
+    const cart = await this.getOrCreateCart(customerId);
+
+    if (clearFirst) {
+      cart.items = [];
+    }
+
+    for (const draft of drafts) {
+      const draftIdStr = (draft as any)._id.toString();
+
+      // Evitamos duplicados si ya está en el carrito
+      const alreadyInCart = cart.items.some((item) => item.draftId === draftIdStr);
+      if (alreadyInCart) continue;
+
+      const cartItem: CartItem = {
+        cartItemId: uuidv4(),
+        customName: draft.name || "Borrador importado",
+        technicalSnapshot: draft.configuration,
+        subtotalPoints: draft.currentPricePoints,
+        draftId: draftIdStr,
+      };
+
+      cart.items.push(cartItem);
+    }
+
+    this.calculateTotal(cart);
+    return cart.save();
   }
 
   private calculateTotal(cart: CartDocument) {

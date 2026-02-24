@@ -82,7 +82,7 @@ export class AnalyticsService {
                   $reduce: {
                     input: "$items",
                     initialValue: [],
-                    in: { $concatArrays: ["$$value", { $ifNull: ["$$this.technicalSnapshot.pieces", []] }] },
+                    in: { $concatArrays: ["$$value", { $ifNull: ["$$this.technicalSnapshot.mainPieces", []] }] },
                   },
                 },
               },
@@ -148,7 +148,7 @@ export class AnalyticsService {
                     { $ifNull: ["$items.technicalSnapshot.addons", []] },
                     {
                       $reduce: {
-                        input: { $ifNull: ["$items.technicalSnapshot.pieces", []] },
+                        input: { $ifNull: ["$items.technicalSnapshot.mainPieces", []] },
                         initialValue: [],
                         in: { $concatArrays: ["$$value", { $ifNull: ["$$this.appliedAddons", []] }] },
                       },

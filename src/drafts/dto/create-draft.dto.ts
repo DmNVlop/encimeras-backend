@@ -14,6 +14,7 @@ export class CreateDraftDto {
   configuration: {
     wizardTempMaterial: any;
     mainPieces: any[];
+    selectedShapeId?: string;
   };
 
   @IsNumber()

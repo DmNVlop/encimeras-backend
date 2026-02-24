@@ -34,11 +34,11 @@ export class OrderLineItem {
 
   @Prop({ type: MongooseSchema.Types.Mixed, required: true })
   technicalSnapshot: {
-    // Copia profunda de lo que se va a fabricar.
-    // Incluye layout 3D, materiales y cortes exactos.
-    materials: any[];
-    pieces: any[]; // MainPieces con medidas finales
-    addons: any[]; // Accesorios aplicados
+    wizardTempMaterial?: any;
+    selectedShapeId?: string;
+    materials?: any[];
+    mainPieces?: any[];
+    addons?: any[];
   };
 }
 

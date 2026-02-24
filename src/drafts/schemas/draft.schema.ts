@@ -17,6 +17,7 @@ export class Draft extends Document {
   configuration: {
     wizardTempMaterial: any; // [cite: 36]
     mainPieces: any[]; // [cite: 39]
+    selectedShapeId?: string;
     // Otros estados necesarios
   };
 

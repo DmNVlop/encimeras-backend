@@ -11,9 +11,11 @@ export class CartItem {
 
   @Prop({ type: MongooseSchema.Types.Mixed, required: true })
   technicalSnapshot: {
-    materials: any[];
-    pieces: any[];
-    addons: any[];
+    wizardTempMaterial?: any;
+    selectedShapeId?: string;
+    mainPieces?: any[];
+    materials?: any[];
+    addons?: any[];
   };
 
   @Prop({ required: true })
