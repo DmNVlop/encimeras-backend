@@ -21,7 +21,7 @@ export class DiscountRulesController {
   @ApiOperation({ summary: "Create a new discount rule" })
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   create(@Body() createDiscountRuleDto: CreateDiscountRuleDto, @GetUser("factoryId") factoryId: string) {
-    const fid = factoryId || "default-factory";
+    const fid = factoryId || "000000000000000000000000";
     return this.discountRulesService.create(createDiscountRuleDto, fid);
   }
 
@@ -29,7 +29,7 @@ export class DiscountRulesController {
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: "List all active discount rules" })
   findAll(@GetUser("factoryId") factoryId: string) {
-    const fid = factoryId || "default-factory";
+    const fid = factoryId || "000000000000000000000000";
     return this.discountRulesService.findAll(fid);
   }
 
@@ -37,7 +37,7 @@ export class DiscountRulesController {
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: "Get discount rule details" })
   findOne(@Param("id") id: string, @GetUser("factoryId") factoryId: string) {
-    const fid = factoryId || "default-factory";
+    const fid = factoryId || "000000000000000000000000";
     return this.discountRulesService.findOne(id, fid);
   }
 
@@ -46,7 +46,7 @@ export class DiscountRulesController {
   @ApiOperation({ summary: "Update a discount rule" })
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   update(@Param("id") id: string, @Body() updateDiscountRuleDto: UpdateDiscountRuleDto, @GetUser("factoryId") factoryId: string) {
-    const fid = factoryId || "default-factory";
+    const fid = factoryId || "000000000000000000000000";
     return this.discountRulesService.update(id, updateDiscountRuleDto, fid);
   }
 
@@ -54,7 +54,7 @@ export class DiscountRulesController {
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: "Deactivate a discount rule" })
   remove(@Param("id") id: string, @GetUser("factoryId") factoryId: string) {
-    const fid = factoryId || "default-factory";
+    const fid = factoryId || "000000000000000000000000";
     return this.discountRulesService.remove(id, fid);
   }
 }

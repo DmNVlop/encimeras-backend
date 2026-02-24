@@ -22,7 +22,7 @@ export class CustomersController {
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   create(@Body() createCustomerDto: CreateCustomerDto, @GetUser("factoryId") factoryId: string) {
     // Fallback if factoryId is not in token yet
-    const fid = factoryId || "default-factory";
+    const fid = factoryId || "000000000000000000000000";
     return this.customersService.create(createCustomerDto, fid);
   }
 
@@ -30,7 +30,7 @@ export class CustomersController {
   @Roles(Role.ADMIN, Role.SALES)
   @ApiOperation({ summary: "List all active customers" })
   findAll(@GetUser("factoryId") factoryId: string) {
-    const fid = factoryId || "default-factory";
+    const fid = factoryId || "000000000000000000000000";
     return this.customersService.findAll(fid);
   }
 
@@ -38,7 +38,7 @@ export class CustomersController {
   @Roles(Role.ADMIN, Role.SALES)
   @ApiOperation({ summary: "Get customer details" })
   findOne(@Param("id") id: string, @GetUser("factoryId") factoryId: string) {
-    const fid = factoryId || "default-factory";
+    const fid = factoryId || "000000000000000000000000";
     return this.customersService.findOne(id, fid);
   }
 
@@ -47,7 +47,7 @@ export class CustomersController {
   @ApiOperation({ summary: "Update customer information" })
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   update(@Param("id") id: string, @Body() updateCustomerDto: UpdateCustomerDto, @GetUser() user: any) {
-    const fid = user.factoryId || "default-factory";
+    const fid = user.factoryId || "000000000000000000000000";
     return this.customersService.update(id, updateCustomerDto, fid, user.userId, user.roles);
   }
 
@@ -55,7 +55,7 @@ export class CustomersController {
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: "Deactivate a customer (Soft Delete)" })
   remove(@Param("id") id: string, @GetUser("factoryId") factoryId: string) {
-    const fid = factoryId || "default-factory";
+    const fid = factoryId || "000000000000000000000000";
     return this.customersService.remove(id, fid);
   }
 
@@ -63,7 +63,7 @@ export class CustomersController {
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: "Link customer to a platform user" })
   linkToUser(@Param("id") id: string, @Param("userId") userId: string, @GetUser("factoryId") factoryId: string) {
-    const fid = factoryId || "default-factory";
+    const fid = factoryId || "000000000000000000000000";
     return this.customersService.linkToUser(id, userId, fid);
   }
 }
