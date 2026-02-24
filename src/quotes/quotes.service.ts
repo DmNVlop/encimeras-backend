@@ -13,6 +13,8 @@ import { MeasurementRuleSetsService } from "src/measurement-rule-sets/measuremen
 import { MainPiecesService } from "src/main-pieces/main-pieces.service";
 import { MainPiece } from "src/main-pieces/schemas/main-pieces.schema";
 import { Addon } from "src/addons/schemas/addons.schema";
+import { DiscountEngineService } from "src/discount-rules/discount-engine.service";
+import { CustomersService } from "src/customers/customers.service";
 
 // Tipos Helper
 type MainPieceData = CalculateQuoteDto["mainPieces"][0];
@@ -27,12 +29,14 @@ export class QuotesService {
     private readonly addonsService: AddonsService,
     private readonly measurementRuleSetsService: MeasurementRuleSetsService,
     private readonly mainPiecesService: MainPiecesService,
+    private readonly discountEngineService: DiscountEngineService,
+    private readonly customersService: CustomersService,
   ) {}
 
   // ===========================================================================
   // 1. MÉTODO PRINCIPAL: CALCULATE
   // ===========================================================================
-  async calculate(calculateQuoteDto: CalculateQuoteDto): Promise<{ totalPoints: number; pieces: any[] }> {
+  async calculate(calculateQuoteDto: CalculateQuoteDto): Promise<any> {
     let totalProjectPoints = 0;
     const piecesBreakdown: any[] = [];
 
@@ -42,9 +46,11 @@ export class QuotesService {
 
       let pieceSubtotal = 0;
       const pieceDetail: any = {
+        id: piece.id || `temp-${index}`,
         pieceName: `Pieza ${index + 1}`,
         materialId: piece.materialId,
         materialName: material?.name || "Desconocido",
+        materialCategory: material?.category || "GENERAL",
         basePricePoints: 0,
         addons: [],
         subtotalPoints: 0,
@@ -63,7 +69,7 @@ export class QuotesService {
           pieceSubtotal += addonPrice;
 
           pieceDetail.addons.push({
-            addonName: addon.code, // Idealmente buscar el nombre real en DB, pero por performance usamos code o lo traemos del servicio
+            addonName: addon.code,
             name: addonMaster.name,
             imageUrl: addonMaster.imageUrl,
             pricePoints: addonPrice,
@@ -76,9 +82,62 @@ export class QuotesService {
       totalProjectPoints += pieceSubtotal;
     }
 
+    // --- RESOLUCIÓN DE FACTORY ID ---
+    let factoryId = calculateQuoteDto.factoryId;
+    if (!factoryId && calculateQuoteDto.customerId) {
+      try {
+        const customer = await this.customersService.findById(calculateQuoteDto.customerId);
+        if (customer) {
+          factoryId = customer.factoryId.toString();
+        }
+      } catch (e) {
+        // Silenciosamente ignoramos errores de resolución para no romper el cálculo
+      }
+    }
+
+    if (!factoryId) {
+      // Si no hay factoryId, no podemos aplicar reglas de descuento de fábrica
+      return {
+        totalPoints: totalProjectPoints,
+        finalTotalPoints: totalProjectPoints,
+        totalDiscount: 0,
+        appliedRules: [],
+        pieces: piecesBreakdown.map((p) => ({
+          ...p,
+          discountAmount: 0,
+          finalPricePoints: p.subtotalPoints,
+        })),
+      };
+    }
+
+    // --- INTEGRACIÓN DE DESCUENTOS ---
+    // Convertimos nuestras piezas en items procesables por el motor de descuentos
+    const discountableItems = piecesBreakdown.map((p) => ({
+      id: p.materialId,
+      name: p.pieceName,
+      category: p.materialCategory,
+      price: p.subtotalPoints,
+      quantity: 1,
+    }));
+
+    const discountResult = await this.discountEngineService.calculateDiscounts(discountableItems, factoryId, calculateQuoteDto.customerId);
+
+    // Mapeamos los descuentos de vuelta a las piezas (el orden se mantiene)
+    const piecesWithDiscounts = piecesBreakdown.map((p, idx) => {
+      const itemDiscount = discountResult.itemBreakdown[idx];
+      return {
+        ...p,
+        discountAmount: itemDiscount?.discountAmount || 0,
+        finalPricePoints: itemDiscount?.finalPrice || p.subtotalPoints,
+      };
+    });
+
     return {
       totalPoints: totalProjectPoints,
-      pieces: piecesBreakdown,
+      finalTotalPoints: discountResult.finalTotal,
+      totalDiscount: discountResult.totalDiscount,
+      appliedRules: discountResult.appliedRules,
+      pieces: piecesWithDiscounts,
     };
   }
 
@@ -97,10 +156,11 @@ export class QuotesService {
     }
 
     // 3. Guardamos el Presupuesto (Quote)
-    // Aplanamos el desglose para guardarlo simple en la DB si queremos
-    const flatBreakdown = calculation.pieces.map((p) => ({
+    const flatBreakdown = calculation.pieces.map((p: any) => ({
       description: p.pieceName,
       points: p.subtotalPoints,
+      discountAmount: p.discountAmount,
+      finalPoints: p.finalPricePoints,
     }));
 
     const newQuote = new this.quoteModel({
@@ -108,7 +168,10 @@ export class QuotesService {
       customerEmail: createQuoteDto.customerEmail,
       customerPhone: createQuoteDto.customerPhone,
       mainPieces: createdPieceIds, // Referencias
-      totalPrice: calculation.totalPoints,
+      totalPrice: calculation.finalTotalPoints,
+      totalPriceBeforeDiscount: calculation.totalPoints,
+      totalDiscount: calculation.totalDiscount,
+      appliedRules: calculation.appliedRules,
       priceBreakdown: flatBreakdown,
       status: "Pendiente",
     });

@@ -8,6 +8,8 @@ import { PriceConfigsModule } from "src/price-configs/price-configs.module";
 import { AddonsModule } from "src/addons/addons.module";
 import { MeasurementRuleSetsModule } from "src/measurement-rule-sets/measurement-rule-sets.module";
 import { MainPiecesModule } from "src/main-pieces/main-pieces.module";
+import { DiscountRulesModule } from "src/discount-rules/discount-rules.module";
+import { CustomersModule } from "src/customers/customers.module";
 
 @Module({
   imports: [
@@ -15,7 +17,9 @@ import { MainPiecesModule } from "src/main-pieces/main-pieces.module";
     PriceConfigsModule,
     AddonsModule,
     MeasurementRuleSetsModule,
-    MainPiecesModule, // El nuevo servicio para crear piezas
+    MainPiecesModule,
+    DiscountRulesModule,
+    CustomersModule,
     MongooseModule.forFeature([{ name: Quote.name, schema: QuoteSchema }]),
   ],
   controllers: [QuotesController],
