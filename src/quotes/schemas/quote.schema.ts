@@ -25,11 +25,25 @@ export class Quote {
 
   // Totales calculados
   @Prop({ required: true })
-  totalPrice: number; // Puntos Totales
+  totalPrice: number; // Puntos Finales (tras descuentos)
+
+  @Prop({ required: true, default: 0 })
+  totalPriceBeforeDiscount: number;
+
+  @Prop({ default: 0 })
+  totalDiscount: number;
+
+  @Prop({ type: Array, default: [] })
+  appliedRules: Array<{ ruleId: string; ruleName: string; discountAmount: number }>;
 
   // Desglose guardado como objeto JSON para historial
   @Prop({ type: Array })
-  priceBreakdown: Array<{ description: string; points: number }>;
+  priceBreakdown: Array<{
+    description: string;
+    points: number;
+    discountAmount?: number;
+    finalPoints?: number;
+  }>;
 }
 
 export const QuoteSchema = SchemaFactory.createForClass(Quote);

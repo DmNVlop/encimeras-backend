@@ -60,4 +60,14 @@ export class CalculateQuoteDto {
   @ValidateNested({ each: true })
   @Type(() => MainPieceDto)
   mainPieces: MainPieceDto[];
+
+  @ApiProperty({ description: "ID del cliente (opcional, para descuentos)", required: false })
+  @IsString()
+  @IsOptional()
+  customerId?: string;
+
+  @ApiProperty({ description: "ID de la fábrica (opcional)", required: false })
+  @IsString()
+  @IsOptional()
+  factoryId?: string;
 }

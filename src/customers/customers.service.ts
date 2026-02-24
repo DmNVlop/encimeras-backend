@@ -29,6 +29,10 @@ export class CustomersService {
     return customer;
   }
 
+  async findById(id: string): Promise<Customer | null> {
+    return this.customerModel.findById(id).exec();
+  }
+
   async update(id: string, updateCustomerDto: UpdateCustomerDto, factoryId: string, currentUserId: string, currentUserRoles: string[]): Promise<Customer> {
     const customer = await this.findOne(id, factoryId);
 
