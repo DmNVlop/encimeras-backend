@@ -9,6 +9,9 @@ export class Draft extends Document {
   @Prop()
   userEmail?: string; // Para recuperación rápida
 
+  @Prop({ required: false })
+  name?: string; // Nombre personalizado del borrador
+
   // Guardamos la configuración completa del QuoteContext
   @Prop({ type: MongooseSchema.Types.Mixed, required: true })
   configuration: {
