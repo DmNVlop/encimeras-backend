@@ -29,6 +29,9 @@ export class OrderLineItem {
   @Prop({ required: true, default: "COUNTERTOP_PROJECT" })
   type: string;
 
+  @Prop({ required: true })
+  cartItemName: string; // Ej: "Cocina de Juana", "Isla de Tomás"
+
   @Prop({ type: MongooseSchema.Types.Mixed, required: true })
   technicalSnapshot: {
     // Copia profunda de lo que se va a fabricar.

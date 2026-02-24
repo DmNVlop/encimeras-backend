@@ -28,6 +28,9 @@ export class Draft extends Document {
 
   @Prop({ default: false })
   isConverted: boolean; // Si ya se convirtió en orden
+
+  @Prop({ index: true })
+  cartGroupId?: string; // ID de agrupación para múltiples presupuestos en un carrito
 }
 
 export const DraftSchema = SchemaFactory.createForClass(Draft);

@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { BullModule } from "@nestjs/bullmq";
 import * as path from "path";
 import { join } from "path";
 
@@ -26,6 +27,7 @@ import { OrdersModule } from "./orders/orders.module";
 import { UsersModule } from "./users/users.module";
 import { CustomersModule } from "./customers/customers.module";
 import { DiscountRulesModule } from "./discount-rules/discount-rules.module";
+import { CartModule } from "./cart/cart.module";
 
 import { AnalyticsModule } from "./analytics/analytics.module";
 
@@ -38,6 +40,12 @@ import { AnalyticsModule } from "./analytics/analytics.module";
       // hasta la raíz del proyecto y luego al archivo .env
       // envFilePath: path.resolve(__dirname, '..', '.env'), // No funcionó
       envFilePath: path.resolve(process.cwd(), ".env"), // Construye la ruta absoluta al .env
+    }),
+    BullModule.forRoot({
+      connection: {
+        host: process.env.REDIS_HOST || "localhost",
+        port: parseInt(process.env.REDIS_PORT || "6379"),
+      },
     }),
 
     // IMAGENES PUBLICAR
@@ -71,6 +79,7 @@ import { AnalyticsModule } from "./analytics/analytics.module";
     AnalyticsModule,
     CustomersModule,
     DiscountRulesModule,
+    CartModule,
   ],
   controllers: [AppController],
   providers: [AppService],

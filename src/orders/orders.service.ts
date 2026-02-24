@@ -1,10 +1,11 @@
-import { Injectable, BadRequestException, NotFoundException } from "@nestjs/common";
+import { Injectable, BadRequestException, NotFoundException, Inject, forwardRef } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { Model } from "mongoose";
+import { HydratedDocument, Model } from "mongoose";
 import { Order } from "./schemas/order.schema";
 import { CreateOrderDto } from "./dto/create-order.dto";
 import { DraftsService } from "../drafts/drafts.service";
 import { EventsGateway } from "../events/events.gateway";
+import { CartService } from "../cart/cart.service";
 
 @Injectable()
 export class OrdersService {
@@ -12,6 +13,7 @@ export class OrdersService {
     @InjectModel(Order.name) private orderModel: Model<Order>,
     private draftsService: DraftsService,
     private eventsGateway: EventsGateway,
+    private cartService: CartService,
   ) {}
 
   /**
@@ -130,6 +132,58 @@ export class OrdersService {
     this.eventsGateway.notifyOrderUpdate(socketPayload);
 
     return updatedOrder;
+  }
+
+  async createFromCart(customerId: string): Promise<Order> {
+    // 1. Recuperar el Carrito ACTIVO
+    const cart = await this.cartService.getOrCreateCart(customerId);
+
+    if (cart.items.length === 0) {
+      throw new BadRequestException("El carrito está vacío.");
+    }
+
+    // 2. Generar ID Secuencial
+    const orderNumber = await this.generateOrderNumber();
+
+    // 3. Mapear cada CartItem a un OrderLineItem para trazabilidad
+    const orderItems = cart.items.map((item) => ({
+      type: "COUNTERTOP_PROJECT",
+      cartItemName: item.customName, // Trazabilidad: "Cocina de Juana"
+      technicalSnapshot: {
+        materials: item.technicalSnapshot.materials,
+        pieces: item.technicalSnapshot.pieces,
+        addons: item.technicalSnapshot.addons,
+      },
+    }));
+
+    // 4. Crear la Orden Unificada
+    const newOrder = new this.orderModel({
+      header: {
+        orderNumber: orderNumber,
+        customerId: customerId,
+        status: "PENDING",
+        totalPoints: cart.totalPoints,
+        orderDate: new Date(),
+      },
+      items: orderItems,
+    });
+
+    // 5. Guardar Orden
+    const savedOrder = await newOrder.save();
+
+    // 6. "Cerrar" el carrito (Marcar como convertido)
+    cart.status = "CONVERTED";
+    await cart.save();
+
+    // 7. Notificar
+    const orderObject = savedOrder.toObject();
+    const payload = {
+      ...orderObject.header,
+      _id: orderObject._id,
+    };
+    this.eventsGateway.notifyNewOrder(payload);
+
+    return savedOrder;
   }
 
   // Helper para generar IDs tipo "ORD-2026-0045"

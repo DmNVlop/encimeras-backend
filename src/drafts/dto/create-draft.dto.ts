@@ -19,4 +19,8 @@ export class CreateDraftDto {
   @IsNumber()
   @IsNotEmpty()
   currentPricePoints: number;
+
+  @IsOptional()
+  @IsString()
+  cartGroupId?: string;
 }
