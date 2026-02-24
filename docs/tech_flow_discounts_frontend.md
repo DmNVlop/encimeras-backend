@@ -120,4 +120,4 @@ El formulario de creación de reglas debe tener validaciones cruzadas:
 
 - `GET /customers`: Para el buscador de clientes en el presupuesto.
 - `GET /discount-rules/active`: Para pre-visualizar reglas vigentes (opcional).
-- `POST /budget/calculate`: El endpoint principal que consume el `DiscountEngineService`.
+- `POST /quotes/calculate`: El endpoint principal que consume el `DiscountEngineService`.
