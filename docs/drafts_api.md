@@ -12,16 +12,17 @@ Este módulo permite a los usuarios autenticados guardar presupuestos temporales
 
 ## Modelo de Datos (Draft)
 
-| Campo                | Tipo                | Descripción                                                |
-| :------------------- | :------------------ | :--------------------------------------------------------- |
-| `_id`                | `ObjectId`          | Identificador único del borrador.                          |
-| `name`               | `string` (opcional) | Nombre personalizado asignado por el usuario.              |
-| `userId`             | `string`            | ID del usuario propietario.                                |
-| `userEmail`          | `string`            | Email para contacto/recuperación rápida.                   |
-| `configuration`      | `Object`            | Estado completo del presupuesto (materiales, piezas, etc). |
-| `currentPricePoints` | `number`            | Precio calculado al momento de guardar.                    |
-| `expirationDate`     | `Date`              | Fecha límite de validez del presupuesto.                   |
-| `isConverted`        | `boolean`           | Indica si el borrador ya se convirtió en pedido.           |
+| Campo                | Tipo                | Descripción                                                 |
+| :------------------- | :------------------ | :---------------------------------------------------------- |
+| `_id`                | `ObjectId`          | Identificador único del borrador.                           |
+| `name`               | `string` (opcional) | Nombre personalizado asignado por el usuario.               |
+| `userId`             | `string`            | ID del usuario propietario.                                 |
+| `userEmail`          | `string`            | Email para contacto/recuperación rápida.                    |
+| `configuration`      | `Object`            | Estado completo del presupuesto (materiales, piezas, etc).  |
+| `currentPricePoints` | `number`            | Precio calculado al momento de guardar.                     |
+| `expirationDate`     | `Date`              | Fecha límite de validez del presupuesto.                    |
+| `isConverted`        | `boolean`           | Indica si el borrador ya se convirtió en pedido.            |
+| `cartGroupId`        | `string` (opcional) | ID de agrupación para múltiples presupuestos en un carrito. |
 
 ---
 
@@ -115,3 +116,4 @@ Modifica un borrador existente y renueva su fecha de expiración.
 1. **Guardado**: Ofrecer al usuario un campo de texto opcional para nombrar su presupuesto antes de hacer el POST a `/drafts`.
 2. **Listado**: En el área de usuario, mostrar la lista de borradores con su nombre y fecha de expiración.
 3. **Carga**: Al seleccionar un borrador, navegar a `/drafts/:id`. Si la respuesta contiene `EXPIRED_RECALCULATED`, notificar al usuario el cambio de precio mediante un Toast o Banner informativo.
+4. **Grupos**: Si el borrador cargado tiene un `cartGroupId`, sugerir al usuario cargar el resto de elementos del conjunto para completar el proyecto.
