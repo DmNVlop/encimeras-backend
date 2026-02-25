@@ -8,13 +8,15 @@ Una orden se divide en una cabecera comercial (`OrderHeader`) y múltiples líne
 
 ### 1.1 OrderHeader (Cabecera)
 
-| Campo         | Tipo     | Descripción                                            |
-| :------------ | :------- | :----------------------------------------------------- |
-| `orderNumber` | `string` | ID secuencial único (ej: ORD-2026-0001).               |
-| `customerId`  | `string` | Identificador del cliente.                             |
-| `status`      | `enum`   | PENDING, MANUFACTURING, SHIPPED, INSTALLED, CANCELLED. |
-| `totalPoints` | `number` | Puntos totales del pedido (Inmutable).                 |
-| `orderDate`   | `Date`   | Fecha de creación.                                     |
+| Campo                 | Tipo     | Descripción                                            |
+| :-------------------- | :------- | :----------------------------------------------------- |
+| `orderNumber`         | `string` | ID secuencial único (ej: ORD-2026-0001).               |
+| `customerId`          | `string` | Identificador del cliente.                             |
+| `status`              | `enum`   | PENDING, MANUFACTURING, SHIPPED, INSTALLED, CANCELLED. |
+| `totalPoints`         | `number` | Puntos totales finales (después de descuentos).        |
+| `totalOriginalPoints` | `number` | Puntos totales originales (sin descuentos).            |
+| `totalDiscount`       | `number` | Descuento total aplicado al pedido.                    |
+| `orderDate`           | `Date`   | Fecha de creación.                                     |
 
 ### 1.2 OrderLineItem (Línea de Detalle)
 
@@ -25,6 +27,8 @@ Cada línea representa un presupuesto independiente (ej: una cocina o una isla).
 | `cartItemName` | `string` | **Alias del presupuesto** (ej: "Cocina de Juana"). |
 | `core` | `Object` | Snapshot inmutable de materiales, piezas y fábrica. |
 | `uiState` | `Object` | Snapshot inmutable de metadatos visuales. |
+| `originalPoints` | `number` | Precio original de esta línea (sin descuento). |
+| `discountAmount` | `number` | Descuento aplicado a esta línea. |
 
 ---
 

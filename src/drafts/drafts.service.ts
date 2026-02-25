@@ -26,6 +26,8 @@ export class DraftsService {
 
     const newDraft = new this.draftModel({
       ...createDraftDto,
+      originalPoints: createDraftDto.originalPoints ?? createDraftDto.currentPricePoints,
+      discountAmount: createDraftDto.discountAmount ?? 0,
       userId: userId || null,
       expirationDate,
       isConverted: false,
@@ -75,8 +77,10 @@ export class DraftsService {
     });
 
     // Actualizamos el precio en el borrador (pero no la fecha, sigue expirado hasta que el usuario guarde de nuevo)
-    const safePoints = Number.isFinite(calculation.totalPoints) ? calculation.totalPoints : 0;
+    const safePoints = Number.isFinite(calculation.finalTotalPoints) ? calculation.finalTotalPoints : 0;
     draft.currentPricePoints = safePoints;
+    draft.originalPoints = calculation.totalPoints;
+    draft.discountAmount = calculation.totalDiscount;
     await draft.save();
 
     return {

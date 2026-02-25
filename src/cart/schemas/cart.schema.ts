@@ -22,6 +22,15 @@ export class CartItem {
   @Prop({ required: true })
   subtotalPoints: number;
 
+  @Prop({ required: true, default: 0 })
+  originalPoints: number;
+
+  @Prop({ required: true, default: 0 })
+  discountAmount: number;
+
+  @Prop({ type: MongooseSchema.Types.Mixed, default: [] })
+  appliedRules: any[];
+
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: "Draft" })
   draftId?: string;
 
@@ -46,6 +55,12 @@ export class Cart {
 
   @Prop({ required: true, default: 0 })
   totalPoints: number;
+
+  @Prop({ required: true, default: 0 })
+  totalOriginalPoints: number;
+
+  @Prop({ required: true, default: 0 })
+  totalDiscount: number;
 
   @Prop({ required: true })
   expiresAt: Date;

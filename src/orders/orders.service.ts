@@ -76,10 +76,15 @@ export class OrdersService {
           cartItemName: draft.name || "Proyecto desde Borrador",
           core: draft.core,
           uiState: draft.uiState,
+          originalPoints: (draft as any).originalPoints || draft.currentPricePoints,
+          discountAmount: (draft as any).discountAmount || 0,
         },
       ],
       originDraftId: draft._id,
     });
+
+    newOrder.header.totalOriginalPoints = (draft as any).originalPoints || draft.currentPricePoints;
+    newOrder.header.totalDiscount = (draft as any).discountAmount || 0;
 
     // 5. Guardar Orden y "Quemar" el Borrador
     const savedOrder = await newOrder.save();
@@ -147,6 +152,8 @@ export class OrdersService {
       cartItemName: item.customName, // Trazabilidad: "Cocina de Juana"
       core: item.core,
       uiState: item.uiState,
+      originalPoints: (item as any).originalPoints || item.subtotalPoints,
+      discountAmount: (item as any).discountAmount || 0,
     }));
 
     // 4. Crear la Orden Unificada
@@ -156,6 +163,8 @@ export class OrdersService {
         customerId: customerId,
         status: "PENDING",
         totalPoints: cartData.totalPoints,
+        totalOriginalPoints: cartData.totalOriginalPoints || cartData.totalPoints,
+        totalDiscount: cartData.totalDiscount || 0,
         orderDate: new Date(),
       },
       items: orderItems,

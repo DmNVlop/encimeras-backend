@@ -14,7 +14,13 @@ export class OrderHeader {
   status: string;
 
   @Prop({ required: true })
-  totalPoints: number; // Valor inmutable
+  totalPoints: number; // Valor inmutable final
+
+  @Prop({ required: true, default: 0 })
+  totalOriginalPoints: number;
+
+  @Prop({ required: true, default: 0 })
+  totalDiscount: number;
 
   @Prop({ required: true })
   orderDate: Date;
@@ -41,6 +47,12 @@ export class OrderLineItem {
 
   @Prop({ type: MongooseSchema.Types.Mixed })
   uiState?: Record<string, any>;
+
+  @Prop({ required: true, default: 0 })
+  originalPoints: number;
+
+  @Prop({ required: true, default: 0 })
+  discountAmount: number;
 }
 
 @Schema({ timestamps: true })

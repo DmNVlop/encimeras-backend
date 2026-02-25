@@ -10,7 +10,10 @@ Este módulo gestiona la agrupación de presupuestos antes de convertirlos en un
 | `customName`      | `string` | Alias (ej: "Cocina Principal").                                            |
 | `core`            | `Object` | Datos de negocio (Contrato con el motor de cálculo).                       |
 | `uiState`         | `Object` | Datos visuales opacos para el backend.                                     |
-| `subtotalPoints`  | `number` | Precio calculado por el backend (Inmutable desde el cliente).              |
+| `subtotalPoints`  | `number` | Precio final calculado (después de descuentos).                            |
+| `originalPoints`  | `number` | Precio base antes de aplicar descuentos.                                   |
+| `discountAmount`  | `number` | Importe total descontado en este ítem.                                     |
+| `appliedRules`    | `Array`  | Reglas de descuento aplicadas a este ítem.                                 |
 | `hydratedContext` | `Object` | **Inyectado por el backend** en el `GET`. Contiene detalles de materiales. |
 
 ---
@@ -23,6 +26,14 @@ Devuelve el carrito activo del usuario, con los ítems **hidratados** (patrón B
 
 - **URL**: `GET /cart`
 - **Auth**: Requerido (JWT)
+
+#### Resumen de Totales en el Carrito:
+
+Además de los ítems, el objeto raíz del carrito incluye:
+
+- `totalPoints`: Suma de los subtotales con descuento.
+- `totalOriginalPoints`: Suma de los precios base sin descuento.
+- `totalDiscount`: Ahorro total acumulado en el carrito.
 
 ### 2.2 Añadir al Carrito
 

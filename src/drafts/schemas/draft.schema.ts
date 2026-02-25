@@ -25,7 +25,13 @@ export class Draft extends Document {
   uiState?: Record<string, any>;
 
   @Prop({ required: true })
-  currentPricePoints: number; // Precio calculado al momento de guardar
+  currentPricePoints: number; // Precio con descuento
+
+  @Prop({ required: true, default: 0 })
+  originalPoints: number;
+
+  @Prop({ required: true, default: 0 })
+  discountAmount: number;
 
   @Prop({ required: true, index: true })
   expirationDate: Date; // Fecha límite de validez

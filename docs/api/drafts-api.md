@@ -20,7 +20,9 @@ Este módulo permite a los usuarios autenticados guardar presupuestos temporales
 | `userEmail`          | `string`            | Email para contacto/recuperación rápida.                    |
 | `core`               | `Object`            | Datos estrictos de negocio (piezas, medidas, fábrica).      |
 | `uiState`            | `Object` (opcional) | Metadatos visuales opacos para el backend.                  |
-| `currentPricePoints` | `number`            | Precio calculado al momento de guardar.                     |
+| `currentPricePoints` | `number`            | Precio final calculado (con descuento).                     |
+| `originalPoints`     | `number`            | Precio original sin aplicar descuentos.                     |
+| `discountAmount`     | `number`            | Importe total descontado en este borrador.                  |
 | `expirationDate`     | `Date`              | Fecha límite de validez del presupuesto.                    |
 | `isConverted`        | `boolean`           | Indica si el borrador ya se convirtió en pedido.            |
 | `cartGroupId`        | `string` (opcional) | ID de agrupación para múltiples presupuestos en un carrito. |
@@ -81,8 +83,13 @@ Obtiene los detalles de un borrador específico. Maneja la lógica de expiració
   {
     "status": "VALID", // o "EXPIRED_RECALCULATED"
     "message": "Borrador recuperado",
-    "data": { ... }, // Objeto Draft completo
-    "newPrice": null // Solo tendrá valor si status es EXPIRED_RECALCULATED
+    "data": {
+      "currentPricePoints": 1300,
+      "originalPoints": 1500,
+      "discountAmount": 200,
+      "...": "..."
+    },
+    "newPrice": 1300 // Solo tendrá valor si status es EXPIRED_RECALCULATED (es el finalTotal)
   }
   ```
   > **Nota para Frontend**: Si el `status` es `EXPIRED_RECALCULATED`, se debe mostrar un aviso al usuario indicando que los precios han sido actualizados a la tarifa vigente.

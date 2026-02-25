@@ -93,7 +93,10 @@ export class CartService {
       customName: addToCartDto.customName,
       core: addToCartDto.core,
       uiState: addToCartDto.uiState,
-      subtotalPoints: calculation.finalTotalPoints, // Siempre usamos el precio REAL del backend
+      subtotalPoints: calculation.finalTotalPoints, // Precio REAL con descuento
+      originalPoints: calculation.totalPoints, // Precio original sin descuento
+      discountAmount: calculation.totalDiscount,
+      appliedRules: calculation.appliedRules,
       draftId: addToCartDto.draftId,
     };
 
@@ -157,6 +160,9 @@ export class CartService {
         factoryId: cart.items[itemIndex].core.factoryId,
       });
       cart.items[itemIndex].subtotalPoints = calculation.finalTotalPoints;
+      cart.items[itemIndex].originalPoints = calculation.totalPoints;
+      cart.items[itemIndex].discountAmount = calculation.totalDiscount;
+      cart.items[itemIndex].appliedRules = calculation.appliedRules;
     }
 
     if (updateDto.uiState) {
@@ -238,6 +244,8 @@ export class CartService {
         core: draft.core,
         uiState: draft.uiState,
         subtotalPoints: draft.currentPricePoints,
+        originalPoints: (draft as any).originalPoints || draft.currentPricePoints,
+        discountAmount: (draft as any).discountAmount || 0,
         draftId: draftIdStr,
       };
 
@@ -251,6 +259,8 @@ export class CartService {
 
   private calculateTotal(cart: CartDocument) {
     cart.totalPoints = cart.items.reduce((sum, item) => sum + item.subtotalPoints, 0);
+    cart.totalOriginalPoints = cart.items.reduce((sum, item) => sum + (item.originalPoints || item.subtotalPoints), 0);
+    cart.totalDiscount = cart.items.reduce((sum, item) => sum + (item.discountAmount || 0), 0);
   }
 
   /**
