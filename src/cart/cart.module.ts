@@ -6,6 +6,7 @@ import { CartController } from "./cart.controller";
 import { Cart, CartSchema } from "./schemas/cart.schema";
 import { QuotesModule } from "../quotes/quotes.module";
 import { DraftsModule } from "../drafts/drafts.module";
+import { MaterialsModule } from "../materials/materials.module";
 
 @Module({
   imports: [
@@ -15,7 +16,9 @@ import { DraftsModule } from "../drafts/drafts.module";
     }),
     QuotesModule, // Para validar precios si fuera necesario
     DraftsModule, // Para guardar grupos de borradores
+    MaterialsModule, // Para hidratación de datos (BFF)
   ],
+
   controllers: [CartController],
   providers: [CartService],
   exports: [CartService],

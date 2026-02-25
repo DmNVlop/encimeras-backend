@@ -18,7 +18,8 @@ Este módulo permite a los usuarios autenticados guardar presupuestos temporales
 | `name`               | `string` (opcional) | Nombre personalizado asignado por el usuario.               |
 | `userId`             | `string`            | ID del usuario propietario.                                 |
 | `userEmail`          | `string`            | Email para contacto/recuperación rápida.                    |
-| `configuration`      | `Object`            | Estado completo del presupuesto (materiales, piezas, etc).  |
+| `core`               | `Object`            | Datos estrictos de negocio (piezas, medidas, fábrica).      |
+| `uiState`            | `Object` (opcional) | Metadatos visuales opacos para el backend.                  |
 | `currentPricePoints` | `number`            | Precio calculado al momento de guardar.                     |
 | `expirationDate`     | `Date`              | Fecha límite de validez del presupuesto.                    |
 | `isConverted`        | `boolean`           | Indica si el borrador ya se convirtió en pedido.            |
@@ -45,17 +46,21 @@ Crea un nuevo borrador con la configuración actual.
 - **URL**: `POST /drafts`
 - **Auth**: Requerido (JWT)
 - **Body**:
+
   ```json
   {
     "name": "Presupuesto Cocina XL",
-    "userEmail": "usuario@ejemplo.com",
-    "configuration": {
-      "wizardTempMaterial": { ... },
-      "mainPieces": [ ... ]
+    "core": {
+      "mainPieces": [ ... ],
+      "factoryId": "..."
     },
-    "currentPricePoints": 1250.50
+    "uiState": {
+      "wizardTempMaterial": { ... },
+      "lastStep": 3
+    }
   }
   ```
+
 - **Respuesta** (201 Created):
   ```json
   {

@@ -33,13 +33,14 @@ export class OrderLineItem {
   cartItemName: string; // Ej: "Cocina de Juana", "Isla de Tomás"
 
   @Prop({ type: MongooseSchema.Types.Mixed, required: true })
-  technicalSnapshot: {
-    wizardTempMaterial?: any;
-    selectedShapeId?: string;
-    materials?: any[];
-    mainPieces?: any[];
-    addons?: any[];
+  core: {
+    mainPieces: any[];
+    factoryId?: string;
+    [key: string]: any;
   };
+
+  @Prop({ type: MongooseSchema.Types.Mixed })
+  uiState?: Record<string, any>;
 }
 
 @Schema({ timestamps: true })

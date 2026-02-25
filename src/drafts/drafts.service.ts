@@ -68,9 +68,10 @@ export class DraftsService {
     }
 
     // CASO B: El borrador ha CADUCADO -> Recálculo Obligatorio
-    // Usamos mainPieces para recalcular
+    // Usamos core para recalcular
     const calculation = await this.pricingService.calculate({
-      mainPieces: draft.configuration.mainPieces,
+      mainPieces: draft.core.mainPieces,
+      factoryId: draft.core.factoryId,
     });
 
     // Actualizamos el precio en el borrador (pero no la fecha, sigue expirado hasta que el usuario guarde de nuevo)

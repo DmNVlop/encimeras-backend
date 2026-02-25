@@ -73,13 +73,9 @@ export class OrdersService {
       items: [
         {
           type: "COUNTERTOP_PROJECT",
-          technicalSnapshot: {
-            ...draft.configuration,
-            // Fallbacks for backward compatibility if needed
-            materials: draft.configuration.materials || [draft.configuration.wizardTempMaterial],
-            mainPieces: draft.configuration.mainPieces,
-            addons: draft.configuration.addons || draft.configuration.globalAddons || [],
-          },
+          cartItemName: draft.name || "Proyecto desde Borrador",
+          core: draft.core,
+          uiState: draft.uiState,
         },
       ],
       originDraftId: draft._id,
@@ -136,9 +132,9 @@ export class OrdersService {
 
   async createFromCart(customerId: string): Promise<Order> {
     // 1. Recuperar el Carrito ACTIVO
-    const cart = await this.cartService.getOrCreateCart(customerId);
+    const cartData = await this.cartService.getOrCreateCart(customerId);
 
-    if (cart.items.length === 0) {
+    if (!cartData || cartData.items.length === 0) {
       throw new BadRequestException("El carrito está vacío.");
     }
 
@@ -146,12 +142,11 @@ export class OrdersService {
     const orderNumber = await this.generateOrderNumber();
 
     // 3. Mapear cada CartItem a un OrderLineItem para trazabilidad
-    const orderItems = cart.items.map((item) => ({
+    const orderItems = cartData.items.map((item) => ({
       type: "COUNTERTOP_PROJECT",
       cartItemName: item.customName, // Trazabilidad: "Cocina de Juana"
-      technicalSnapshot: {
-        ...item.technicalSnapshot,
-      },
+      core: item.core,
+      uiState: item.uiState,
     }));
 
     // 4. Crear la Orden Unificada
@@ -160,7 +155,7 @@ export class OrdersService {
         orderNumber: orderNumber,
         customerId: customerId,
         status: "PENDING",
-        totalPoints: cart.totalPoints,
+        totalPoints: cartData.totalPoints,
         orderDate: new Date(),
       },
       items: orderItems,
@@ -170,8 +165,9 @@ export class OrdersService {
     const savedOrder = await newOrder.save();
 
     // 6. "Cerrar" el carrito (Marcar como convertido)
-    cart.status = "CONVERTED";
-    await cart.save();
+    // Nota: El carrito devuelto por getOrCreateCart suele estar hidratado.
+    // Usamos el modelo para actualizar status.
+    await (this.cartService as any).cartModel.findOneAndUpdate({ customerId, status: "ACTIVE" }, { status: "CONVERTED" });
 
     // 7. Notificar
     const orderObject = savedOrder.toObject();

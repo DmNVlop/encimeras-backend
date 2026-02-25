@@ -1,24 +1,26 @@
-import { IsString, IsNotEmpty, IsOptional, IsNumber, IsArray, IsObject } from "class-validator";
+import { IsString, IsNotEmpty, IsOptional, IsNumber, IsArray, IsObject, ValidateNested } from "class-validator";
+import { Type } from "class-transformer";
+import { CoreEntityDto } from "./core-entity.dto";
 
 export class AddToCartDto {
   @IsString()
   @IsNotEmpty()
   customName: string;
 
-  @IsObject()
+  /**
+   * Datos estrictos para el motor de cálculo
+   */
   @IsNotEmpty()
-  configuration: {
-    wizardTempMaterial?: any;
-    selectedShapeId?: string;
-    mainPieces: any[];
-    materials?: any[];
-    addons?: any[];
-    [key: string]: any; // Allow for extensibility
-  };
+  @ValidateNested()
+  @Type(() => CoreEntityDto)
+  core: CoreEntityDto;
 
-  @IsNumber()
-  @IsNotEmpty()
-  subtotalPoints: number;
+  /**
+   * Metadatos opacos para el backend, usados solo por el frontend para restaurar estado visual.
+   */
+  @IsObject()
+  @IsOptional()
+  uiState?: Record<string, any>;
 
   @IsString()
   @IsOptional()
@@ -30,20 +32,14 @@ export class UpdateCartItemDto {
   @IsOptional()
   customName?: string;
 
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CoreEntityDto)
+  core?: CoreEntityDto;
+
   @IsObject()
   @IsOptional()
-  configuration?: {
-    wizardTempMaterial?: any;
-    selectedShapeId?: string;
-    mainPieces?: any[];
-    materials?: any[];
-    addons?: any[];
-    [key: string]: any;
-  };
-
-  @IsNumber()
-  @IsOptional()
-  subtotalPoints?: number;
+  uiState?: Record<string, any>;
 }
 
 export class RemoveItemsDto {

@@ -10,19 +10,28 @@ export class CartItem {
   customName: string; // Ej: "Cocina de Juana"
 
   @Prop({ type: MongooseSchema.Types.Mixed, required: true })
-  technicalSnapshot: {
-    wizardTempMaterial?: any;
-    selectedShapeId?: string;
-    mainPieces?: any[];
-    materials?: any[];
-    addons?: any[];
+  core: {
+    mainPieces: any[];
+    factoryId?: string;
+    [key: string]: any;
   };
+
+  @Prop({ type: MongooseSchema.Types.Mixed })
+  uiState?: Record<string, any>;
 
   @Prop({ required: true })
   subtotalPoints: number;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: "Draft" })
   draftId?: string;
+
+  /**
+   * Este campo NO se guarda en la DB.
+   * Se llena dinámicamente en el Service (patrón BFF) para enviar al Front
+   * información actualizada (nombres de materiales, precios actuales, etc.)
+   */
+  @Prop({ type: MongooseSchema.Types.Mixed })
+  hydratedContext?: Record<string, any>;
 }
 
 export type CartDocument = Cart & Document;

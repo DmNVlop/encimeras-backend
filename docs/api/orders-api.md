@@ -23,7 +23,8 @@ Cada línea representa un presupuesto independiente (ej: una cocina o una isla).
 | :--- | :--- | :--- |
 | `type` | `string` | Por defecto "COUNTERTOP_PROJECT". |
 | `cartItemName` | `string` | **Alias del presupuesto** (ej: "Cocina de Juana"). |
-| `technicalSnapshot` | `Object` | Copia inmutable de materiales, piezas y accesorios. |
+| `core` | `Object` | Snapshot inmutable de materiales, piezas y fábrica. |
+| `uiState` | `Object` | Snapshot inmutable de metadatos visuales. |
 
 ---
 
@@ -45,7 +46,7 @@ Retorna la orden completa con todos los snapshots técnicos.
 
 ### 2.3 Checkout desde Carrito (NUEVO - RECOMENDADO)
 
-Inicia el proceso asíncrono. Ver guía de [Integración de Carrito](./frontend/integracion-carrito-ordenes.md).
+Inicia el proceso asíncrono. Ver guía de [Gestión de Datos Core/UI](../ux-ui/guia-datos-core-ui.md).
 
 - **URL**: `POST /cart/checkout`
 - **Respuesta**: 202 Accepted con `jobId`.
