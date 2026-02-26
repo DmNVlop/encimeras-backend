@@ -18,10 +18,12 @@ export class OrdersService {
 
   /**
    * Obtiene todas las órdenes pero filtrando solo el "Shared Header".
-   * Esto optimiza el rendimiento del Panel de Administración (DataGrid).
+   * Si se pasa ownerId, se filtra para que el usuario solo vea lo suyo.
    */
-  async findAllHeaders(status?: string): Promise<any[]> {
-    const query = status ? { "header.status": status } : {};
+  async findAllHeaders(status?: string, ownerId?: string): Promise<any[]> {
+    const query: any = {};
+    if (status) query["header.status"] = status;
+    if (ownerId) query["header.customerId"] = ownerId; // Asumimos que customerId guarda el ID de usuario único
 
     return this.orderModel
       .find(query)
@@ -32,13 +34,16 @@ export class OrdersService {
 
   /**
    * Obtiene el detalle completo de una orden, incluyendo el technicalSnapshot.
-   * Se usa cuando el administrador entra en la ficha de producción.
+   * Se añade validación de propiedad si se proporciona ownerId (para rol USER).
    */
-  async findOne(id: string): Promise<Order> {
-    const order = await this.orderModel.findById(id).lean();
+  async findOne(id: string, ownerId?: string): Promise<Order> {
+    const query: any = { _id: id };
+    if (ownerId) query["header.customerId"] = ownerId;
+
+    const order = await this.orderModel.findOne(query).lean();
 
     if (!order) {
-      throw new NotFoundException(`La orden con ID ${id} no existe.`);
+      throw new NotFoundException(`La orden con ID ${id} no existe o no tienes permiso para verla.`);
     }
 
     return order as Order;

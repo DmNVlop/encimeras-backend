@@ -1,55 +1,52 @@
-import {
-    Controller,
-    Get,
-    Post,
-    Body,
-    Patch,
-    Param,
-    Delete,
-    UsePipes,
-    ValidationPipe,
-    UseGuards,
-} from '@nestjs/common';
-import { AddonsService } from './addons.service';
-import { CreateAddonDto } from './dto/create-addons.dto';
-import { UpdateAddonDto } from './dto/update-addons.dto';
-import { ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UsePipes, ValidationPipe, UseGuards } from "@nestjs/common";
+import { AddonsService } from "./addons.service";
+import { CreateAddonDto } from "./dto/create-addons.dto";
+import { UpdateAddonDto } from "./dto/update-addons.dto";
+import { ApiBearerAuth } from "@nestjs/swagger";
+import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 
-@Controller('addons')
+import { RolesGuard } from "src/auth/guards/roles.guard";
+import { Roles } from "src/auth/decorators/roles.decorator";
+import { Role } from "src/auth/enums/role.enum";
+
+@Controller("addons")
+@UseGuards(RolesGuard)
 export class AddonsController {
-    constructor(private readonly addonsService: AddonsService) { }
+  constructor(private readonly addonsService: AddonsService) {}
 
-    @Get()
-    findAll() {
-        return this.addonsService.findAll();
-    }
+  @Get()
+  findAll() {
+    return this.addonsService.findAll();
+  }
 
-    @Get(':id')
-    findOne(@Param('id') id: string) {
-        return this.addonsService.findOne(id);
-    }
+  @Get(":id")
+  findOne(@Param("id") id: string) {
+    return this.addonsService.findOne(id);
+  }
 
-    @ApiBearerAuth()
-    @UseGuards(JwtAuthGuard)
-    @Post()
-    @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-    create(@Body() createAddonDto: CreateAddonDto) {
-        return this.addonsService.create(createAddonDto);
-    }
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Roles(Role.ADMIN)
+  @Post()
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  create(@Body() createAddonDto: CreateAddonDto) {
+    return this.addonsService.create(createAddonDto);
+  }
 
-    @ApiBearerAuth()
-    @UseGuards(JwtAuthGuard)
-    @Patch(':id')
-    @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-    update(@Param('id') id: string, @Body() updateAddonDto: UpdateAddonDto) {
-        return this.addonsService.update(id, updateAddonDto);
-    }
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Roles(Role.ADMIN)
+  @Patch(":id")
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  update(@Param("id") id: string, @Body() updateAddonDto: UpdateAddonDto) {
+    return this.addonsService.update(id, updateAddonDto);
+  }
 
-    @ApiBearerAuth()
-    @UseGuards(JwtAuthGuard)
-    @Delete(':id')
-    remove(@Param('id') id: string) {
-        return this.addonsService.remove(id);
-    }
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Roles(Role.ADMIN)
+  @Delete(":id")
+  remove(@Param("id") id: string) {
+    return this.addonsService.remove(id);
+  }
 }

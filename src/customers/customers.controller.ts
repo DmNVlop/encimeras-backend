@@ -43,8 +43,8 @@ export class CustomersController {
   }
 
   @Patch(":id")
-  @Roles(Role.ADMIN, Role.USER)
-  @ApiOperation({ summary: "Update customer information" })
+  @Roles(Role.ADMIN, Role.SALES)
+  @ApiOperation({ summary: "Update customer information (Admin & Sales)" })
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   update(@Param("id") id: string, @Body() updateCustomerDto: UpdateCustomerDto, @GetUser() user: any) {
     const fid = user.factoryId || "000000000000000000000000";
