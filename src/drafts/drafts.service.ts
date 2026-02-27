@@ -24,10 +24,27 @@ export class DraftsService {
     const expirationDate = new Date();
     expirationDate.setDate(expirationDate.getDate() + validityDays);
 
+    let finalCurrentPrice = createDraftDto.currentPricePoints;
+    let finalOriginalPrice = createDraftDto.originalPoints;
+    let finalDiscount = createDraftDto.discountAmount;
+
+    // Si no vienen los precios calculados, los calculamos en el backend (ROBUSTEZ)
+    if (finalCurrentPrice === undefined || finalCurrentPrice === null) {
+      const calculation = await this.pricingService.calculate({
+        mainPieces: createDraftDto.core.mainPieces as any,
+        factoryId: createDraftDto.core.factoryId,
+        customerId: createDraftDto.core.customerId || userId,
+      });
+      finalCurrentPrice = Number.isFinite(calculation.finalTotalPoints) ? calculation.finalTotalPoints : 0;
+      finalOriginalPrice = Number.isFinite(calculation.totalPoints) ? calculation.totalPoints : finalCurrentPrice;
+      finalDiscount = Number.isFinite(calculation.totalDiscount) ? calculation.totalDiscount : 0;
+    }
+
     const newDraft = new this.draftModel({
       ...createDraftDto,
-      originalPoints: createDraftDto.originalPoints ?? createDraftDto.currentPricePoints,
-      discountAmount: createDraftDto.discountAmount ?? 0,
+      currentPricePoints: finalCurrentPrice,
+      originalPoints: finalOriginalPrice ?? finalCurrentPrice,
+      discountAmount: finalDiscount ?? 0,
       userId: userId || null,
       expirationDate,
       isConverted: false,
@@ -99,10 +116,29 @@ export class DraftsService {
     const newExpirationDate = new Date();
     newExpirationDate.setDate(newExpirationDate.getDate() + validityDays);
 
+    let finalCurrentPrice = updateDraftDto.currentPricePoints;
+    let finalOriginalPrice = updateDraftDto.originalPoints;
+    let finalDiscount = updateDraftDto.discountAmount;
+
+    // Si no vienen los precios calculados, los calculamos en el backend (ROBUSTEZ)
+    if (finalCurrentPrice === undefined || finalCurrentPrice === null) {
+      const calculation = await this.pricingService.calculate({
+        mainPieces: updateDraftDto.core.mainPieces as any,
+        factoryId: updateDraftDto.core.factoryId,
+        customerId: updateDraftDto.core.customerId || userId,
+      });
+      finalCurrentPrice = Number.isFinite(calculation.finalTotalPoints) ? calculation.finalTotalPoints : 0;
+      finalOriginalPrice = Number.isFinite(calculation.totalPoints) ? calculation.totalPoints : finalCurrentPrice;
+      finalDiscount = Number.isFinite(calculation.totalDiscount) ? calculation.totalDiscount : 0;
+    }
+
     const updatedDraft = await this.draftModel.findOneAndUpdate(
       { _id: id, userId },
       {
         ...updateDraftDto,
+        currentPricePoints: finalCurrentPrice,
+        originalPoints: finalOriginalPrice ?? finalCurrentPrice,
+        discountAmount: finalDiscount ?? 0,
         expirationDate: newExpirationDate,
       },
       { new: true }, // Para que devuelva el documento ya actualizado

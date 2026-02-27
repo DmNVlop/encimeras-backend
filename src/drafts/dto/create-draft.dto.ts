@@ -21,8 +21,8 @@ export class CreateDraftDto {
   uiState?: Record<string, any>;
 
   @IsNumber()
-  @IsNotEmpty()
-  currentPricePoints: number;
+  @IsOptional()
+  currentPricePoints?: number;
 
   @IsOptional()
   @IsNumber()
