@@ -272,7 +272,20 @@ export class CartService {
     const customer = await this.customersService.findById(customerId);
     if (!customer) throw new NotFoundException("Cliente no encontrado");
 
+    // Asignar al carrito global
     cart.customerId = customerId;
+
+    // Propagar a todos los items existentes
+    if (cart.items && cart.items.length > 0) {
+      for (const item of cart.items) {
+        if (item.core) {
+          item.core.customerId = customerId;
+          item.core.factoryId = customer.factoryId.toString();
+        }
+      }
+      // Notificamos a Mongoose que el array de items (que contiene objetos Mixed) ha cambiado
+      cart.markModified("items");
+    }
 
     await this.recalculateCartTotals(cart);
     await cart.save();
@@ -292,17 +305,36 @@ export class CartService {
       return;
     }
 
-    // 1. Obtener todos los ítems base brutos para el motor de descuentos
+    // 1. Obtener factoryId base (del cliente si existe, o del primer item)
+    let globalFactoryId: string | undefined;
+
+    if (cart.customerId) {
+      const customer = await this.customersService.findById(cart.customerId);
+      if (customer) {
+        globalFactoryId = customer.factoryId.toString();
+      }
+    }
+
+    if (!globalFactoryId && cart.items[0]?.core?.factoryId) {
+      globalFactoryId = cart.items[0].core.factoryId;
+    }
+
+    // 2. Obtener todos los ítems base brutos para el motor de descuentos
     const allPieces: any[] = [];
     let grossTotal = 0;
 
     for (const item of cart.items) {
+      // Sincronización forzada: Si el carrito tiene cliente, el item DEBE tener ese cliente y su fábrica
+      if (cart.customerId && globalFactoryId) {
+        item.core.customerId = cart.customerId;
+        item.core.factoryId = globalFactoryId;
+      }
+
       // Usamos el QuotesService para obtener los precios brutos de cada pieza
-      // IMPORTANTE: Calculamos sin descuentos individuales para que el motor global decida
       const calculation = await this.quotesService.calculate({
         mainPieces: item.core.mainPieces,
-        factoryId: item.core.factoryId,
-        customerId: cart.customerId || item.core.customerId,
+        factoryId: item.core.factoryId || globalFactoryId,
+        customerId: item.core.customerId || cart.customerId,
       });
 
       // Mapeamos las piezas al formato del motor
@@ -311,34 +343,38 @@ export class CartService {
           id: p.materialId,
           name: p.pieceName,
           category: p.materialCategory,
-          price: p.subtotalPoints, // Precio bruto calculado por QuotesService
+          price: p.subtotalPoints,
           quantity: 1,
         });
         grossTotal += p.subtotalPoints;
       });
 
-      // Actualizamos el ítem del carrito con su subtotal bruto (momentáneo)
+      // Actualizamos metadatos del ítem para reflejar el estado bruto antes de reglas globales
       item.originalPoints = calculation.totalPoints;
       item.subtotalPoints = calculation.totalPoints;
       item.discountAmount = 0;
       item.appliedRules = [];
     }
 
-    // 2. Ejecutar el motor de descuentos global
-    // Necesitamos un factoryId. Si no hay uno global en el carrito, usamos el del primer ítem
-    const factoryId = (cart.items[0].core as any).factoryId;
+    // 3. Ejecutar el motor de descuentos global
+    if (globalFactoryId) {
+      const discountResult = await this.discountEngineService.calculateDiscounts(allPieces, globalFactoryId, cart.customerId);
 
-    const discountResult = await this.discountEngineService.calculateDiscounts(allPieces, factoryId, cart.customerId);
+      // 4. Asignar resultados al carrito
+      cart.totalOriginalPoints = grossTotal;
+      cart.totalPoints = discountResult.finalTotal;
+      cart.totalDiscount = discountResult.totalDiscount;
+      cart.appliedGlobalRules = discountResult.appliedRules;
+    } else {
+      // Fallback si no hay factoryId (no se aplican reglas)
+      cart.totalOriginalPoints = grossTotal;
+      cart.totalPoints = grossTotal;
+      cart.totalDiscount = 0;
+      cart.appliedGlobalRules = [];
+    }
 
-    // 3. Repartir los descuentos de vuelta (si es necesario por ítem o dejarlo global)
-    // En el plan, decidimos que el carrito muestra Ahorro Total.
-    cart.totalOriginalPoints = grossTotal;
-    cart.totalPoints = discountResult.finalTotal;
-    cart.totalDiscount = discountResult.totalDiscount;
-    cart.appliedGlobalRules = discountResult.appliedRules;
-
-    // Opcional: Podríamos recalcular los subtotales de los ítems si quisiéramos
-    // Pero según el doc logica-cliente-carrito.md, el front prefiere ver precios brutos y un ahorro global.
+    // Marcamos items como modificados por si hubo cambios en los cores de los items
+    cart.markModified("items");
   }
 
   private calculateTotal(cart: CartDocument) {
