@@ -24,15 +24,15 @@ export class CartService {
    * Obtiene o crea un carrito para un cliente
    * Implementa patrón BFF: Hidrata los ítems con datos maestros actualizados
    */
-  async getOrCreateCart(customerId: string): Promise<any> {
-    let cart = await this.cartModel.findOne({ customerId, status: "ACTIVE" }).exec();
+  async getOrCreateCart(userId: string): Promise<any> {
+    let cart = await this.cartModel.findOne({ userId, status: "ACTIVE" }).exec();
 
     if (!cart) {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7); // Expira en 7 días
 
       cart = new this.cartModel({
-        customerId,
+        userId,
         status: "ACTIVE",
         totalPoints: 0,
         expiresAt,
@@ -72,19 +72,19 @@ export class CartService {
     };
   }
 
-  async addItem(customerId: string, addToCartDto: AddToCartDto): Promise<any> {
-    const cart = await this.cartModel.findOne({ customerId, status: "ACTIVE" }).exec();
-    if (!cart) await this.getOrCreateCart(customerId);
+  async addItem(userId: string, addToCartDto: AddToCartDto): Promise<any> {
+    const cart = await this.cartModel.findOne({ userId, status: "ACTIVE" }).exec();
+    if (!cart) await this.getOrCreateCart(userId);
 
     // Necesitamos el cart de nuevo si lo acabamos de crear o para asegurar consistencia
-    const activeCart = await this.cartModel.findOne({ customerId, status: "ACTIVE" }).exec();
+    const activeCart = await this.cartModel.findOne({ userId, status: "ACTIVE" }).exec();
     if (!activeCart) throw new BadRequestException("No se pudo crear o encontrar el carrito");
 
     // 1. Validamos el precio antes de añadir (Seguridad Backend)
     // Usamos exclusivamente el nodo 'core'
     const calculation = await this.quotesService.calculate({
       mainPieces: addToCartDto.core.mainPieces,
-      customerId: customerId,
+      customerId: addToCartDto.core.customerId || userId,
       factoryId: addToCartDto.core.factoryId,
     });
 
@@ -104,42 +104,42 @@ export class CartService {
     this.calculateTotal(activeCart as any);
 
     await activeCart.save();
-    return this.getOrCreateCart(customerId); // Devolvemos hidratado
+    return this.getOrCreateCart(userId); // Devolvemos hidratado
   }
 
   /**
    * Elimina un ítem del carrito
    */
-  async removeItem(customerId: string, cartItemId: string): Promise<any> {
-    const cart = await this.cartModel.findOne({ customerId, status: "ACTIVE" }).exec();
+  async removeItem(userId: string, cartItemId: string): Promise<any> {
+    const cart = await this.cartModel.findOne({ userId, status: "ACTIVE" }).exec();
     if (!cart) throw new NotFoundException("Carrito no encontrado");
 
     cart.items = cart.items.filter((item) => item.cartItemId !== cartItemId);
     this.calculateTotal(cart);
 
     await cart.save();
-    return this.getOrCreateCart(customerId);
+    return this.getOrCreateCart(userId);
   }
 
   /**
    * Elimina múltiples ítems del carrito
    */
-  async removeItems(customerId: string, cartItemIds: string[]): Promise<any> {
-    const cart = await this.cartModel.findOne({ customerId, status: "ACTIVE" }).exec();
+  async removeItems(userId: string, cartItemIds: string[]): Promise<any> {
+    const cart = await this.cartModel.findOne({ userId, status: "ACTIVE" }).exec();
     if (!cart) throw new NotFoundException("Carrito no encontrado");
 
     cart.items = cart.items.filter((item) => !cartItemIds.includes(item.cartItemId));
     this.calculateTotal(cart);
 
     await cart.save();
-    return this.getOrCreateCart(customerId);
+    return this.getOrCreateCart(userId);
   }
 
   /**
    * Actualiza un ítem del carrito
    */
-  async updateItem(customerId: string, cartItemId: string, updateDto: UpdateCartItemDto): Promise<any> {
-    const cart = await this.cartModel.findOne({ customerId, status: "ACTIVE" }).exec();
+  async updateItem(userId: string, cartItemId: string, updateDto: UpdateCartItemDto): Promise<any> {
+    const cart = await this.cartModel.findOne({ userId, status: "ACTIVE" }).exec();
     if (!cart) throw new NotFoundException("Carrito no encontrado");
 
     const itemIndex = cart.items.findIndex((item) => item.cartItemId === cartItemId);
@@ -156,7 +156,7 @@ export class CartService {
       // Si cambia el core, recalculamos precio
       const calculation = await this.quotesService.calculate({
         mainPieces: cart.items[itemIndex].core.mainPieces,
-        customerId: customerId,
+        customerId: cart.items[itemIndex].core.customerId || userId,
         factoryId: cart.items[itemIndex].core.factoryId,
       });
       cart.items[itemIndex].subtotalPoints = calculation.finalTotalPoints;
@@ -175,14 +175,14 @@ export class CartService {
     this.calculateTotal(cart);
 
     await cart.save();
-    return this.getOrCreateCart(customerId);
+    return this.getOrCreateCart(userId);
   }
 
   /**
    * Guarda el carrito completo como un grupo de borradores
    */
-  async saveAsDraftGroup(customerId: string): Promise<any> {
-    const cart = await this.cartModel.findOne({ customerId, status: "ACTIVE" }).exec();
+  async saveAsDraftGroup(userId: string): Promise<any> {
+    const cart = await this.cartModel.findOne({ userId, status: "ACTIVE" }).exec();
     if (!cart || cart.items.length === 0) throw new BadRequestException("El carrito está vacío");
 
     const cartGroupId = uuidv4();
@@ -197,7 +197,7 @@ export class CartService {
         cartGroupId: cartGroupId,
       };
 
-      const savedDraft = await this.draftsService.createOrUpdate(draftData, customerId);
+      const savedDraft = await this.draftsService.createOrUpdate(draftData, userId);
 
       // Actualizamos el cartItem con el nuevo draftId
       item.draftId = (savedDraft as any)._id.toString();
@@ -216,15 +216,15 @@ export class CartService {
   /**
    * Importa todos los borradores de un grupo al carrito
    */
-  async importByGroupId(customerId: string, groupId: string, clearFirst: boolean = false): Promise<any> {
-    const drafts = await this.draftsService.findAllByGroupId(groupId, customerId);
+  async importByGroupId(userId: string, groupId: string, clearFirst: boolean = false): Promise<any> {
+    const drafts = await this.draftsService.findAllByGroupId(groupId, userId);
     if (!drafts || drafts.length === 0) {
       throw new NotFoundException(`No se encontraron borradores para el grupo ${groupId}`);
     }
 
-    const cart = await this.cartModel.findOne({ customerId, status: "ACTIVE" }).exec();
-    if (!cart) await this.getOrCreateCart(customerId);
-    const activeCart = await this.cartModel.findOne({ customerId, status: "ACTIVE" }).exec();
+    const cart = await this.cartModel.findOne({ userId, status: "ACTIVE" }).exec();
+    if (!cart) await this.getOrCreateCart(userId);
+    const activeCart = await this.cartModel.findOne({ userId, status: "ACTIVE" }).exec();
     if (!activeCart) throw new BadRequestException("No se pudo crear o encontrar el carrito");
 
     if (clearFirst) {
@@ -254,7 +254,7 @@ export class CartService {
 
     this.calculateTotal(activeCart as any);
     await activeCart.save();
-    return this.getOrCreateCart(customerId);
+    return this.getOrCreateCart(userId);
   }
 
   private calculateTotal(cart: CartDocument) {
@@ -266,8 +266,8 @@ export class CartService {
   /**
    * Inicia el proceso de checkout agregando un trabajo a la cola de BullMQ
    */
-  async checkout(customerId: string): Promise<any> {
-    const cart = await this.cartModel.findOne({ customerId, status: "ACTIVE" }).exec();
+  async checkout(userId: string): Promise<any> {
+    const cart = await this.cartModel.findOne({ userId, status: "ACTIVE" }).exec();
 
     if (!cart || cart.items.length === 0) {
       throw new BadRequestException("El carrito está vacío o no existe.");
@@ -277,7 +277,7 @@ export class CartService {
     // En una implementación real, podríamos ponerle un status 'PROCESSING' para evitar ediciones.
 
     const job = await this.cartQueue.add("process-checkout", {
-      customerId,
+      userId,
       cartId: cart._id,
     });
 

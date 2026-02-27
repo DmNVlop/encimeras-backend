@@ -22,7 +22,7 @@ Este módulo gestiona la agrupación de presupuestos antes de convertirlos en un
 
 ### 2.1 Obtener Carrito Actual
 
-Devuelve el carrito activo del usuario, con los ítems **hidratados** (patrón BFF).
+Devuelve el carrito activo del usuario logueado, con los ítems **hidratados** (patrón BFF). El carrito está vinculado al `userId` del token JWT.
 
 - **URL**: `GET /cart`
 - **Auth**: Requerido (JWT)
@@ -31,6 +31,7 @@ Devuelve el carrito activo del usuario, con los ítems **hidratados** (patrón B
 
 Además de los ítems, el objeto raíz del carrito incluye:
 
+- `userId`: ID del usuario/vendedor propietario del carrito.
 - `totalPoints`: Suma de los subtotales con descuento.
 - `totalOriginalPoints`: Suma de los precios base sin descuento.
 - `totalDiscount`: Ahorro total acumulado en el carrito.
@@ -47,11 +48,14 @@ Añade una nueva configuración. El backend valida el precio automáticamente us
   "customName": "Isla de mármol",
   "core": {
     "mainPieces": [...],
-    "factoryId": "..."
+    "factoryId": "...",
+    "customerId": "ID_DEL_CLIENTE_B2B"
   },
   "uiState": { "selectedShapeId": "L", "lastStep": 2 }
 }
 ```
+
+> **Nota**: El `customerId` dentro de `core` es el cliente final para el cual se calculan los descuentos. El carrito en sí pertenece al usuario autenticado.
 
 ### 2.3 Actualizar Ítem
 

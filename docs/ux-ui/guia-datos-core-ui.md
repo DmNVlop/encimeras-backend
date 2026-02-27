@@ -33,7 +33,8 @@ Hemos dividido el antiguo campo `configuration` (en Carrito y Borradores) en dos
         "appliedAddons": []
       }
     ],
-    "factoryId": "65db1..."
+    "factoryId": "65db1...",
+    "customerId": "65dc2..."
   },
   "uiState": {
     "wizardTempMaterial": { "id": "...", "name": "...", "imageUrl": "..." },
@@ -45,7 +46,7 @@ Hemos dividido el antiguo campo `configuration` (en Carrito y Borradores) en dos
 
 ### 2.2. Guardar Borrador (`POST /drafts`)
 
-Mismo cambio que el carrito. Se requiere el campo `core` para que el backend pueda validar el precio antes de guardar.
+Mismo cambio que el carrito. Se requiere el campo `core` para que el backend pueda validar el precio antes de guardar. El `userId` (vendedor) se toma del token JWT, mientras que `core.customerId` representa al cliente final.
 
 ---
 
@@ -78,7 +79,7 @@ El backend inyecta automáticamente un campo llamado `hydratedContext` en cada �
 
 ## 4. Recomendaciones para el Frontend
 
-1.  **Mapeadores (Adapters):** Cread una función `mapStateToCoreDto(state)` que extraiga solo los campos de `core` desde vuestro Store (Zustand/Redux).
+1.  **Mapeadores (Adapters):** Cread una función `mapStateToCoreDto(state)` que extraiga solo los campos de `core` desde vuestro Store (Zustand/Redux). Aseguraos de incluir `state.selectedCustomerId` en `core.customerId`.
 2.  **Precio de Confianza:** Ignorad cualquier precio calculado localmente al guardar. El backend ignorará campos de precio enviados por el cliente y siempre devolverá el calculado por el motor oficial en la respuesta.
 3.  **Restauración de Estado:** Al abrir un borrador, usad `uiState` para posicionar al usuario en el paso correcto, pero usad `core` + `hydratedContext` para llenar los datos de la configuración actual.
 
@@ -90,6 +91,7 @@ El backend inyecta automáticamente un campo llamado `hydratedContext` en cada �
 interface CoreEntityDto {
   mainPieces: MainPieceDto[]; // Estructura estricta ya conocida
   factoryId?: string;
+  customerId?: string; // ID del cliente B2B seleccionado
 }
 
 interface CartItem {

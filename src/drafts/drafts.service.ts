@@ -74,6 +74,7 @@ export class DraftsService {
     const calculation = await this.pricingService.calculate({
       mainPieces: draft.core.mainPieces,
       factoryId: draft.core.factoryId,
+      customerId: draft.core.customerId || draft.userId,
     });
 
     // Actualizamos el precio en el borrador (pero no la fecha, sigue expirado hasta que el usuario guarde de nuevo)

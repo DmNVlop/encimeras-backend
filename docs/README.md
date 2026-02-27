@@ -10,7 +10,7 @@ Detalle de todos los endpoints disponibles para el frontend.
 
 - [Cálculo de Precios](./api/quotes-calculate-api.md): El motor core.
 - [Carrito de Compras](./api/cart-api.md): Gestión de pedidos múltiples.
-- [Borradores](./api/api/drafts-api.md): Persistencia temporal.
+- [Borradores](./api/drafts-api.md): Persistencia temporal.
 - [Órdenes](./api/orders-api.md): Ciclo de vida de pedidos firmes.
 
 ### 2. 🎨 [UX/UI e Integración](./ux-ui/)

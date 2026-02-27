@@ -48,7 +48,7 @@ export type CartDocument = Cart & Document;
 @Schema({ timestamps: true })
 export class Cart {
   @Prop({ required: true, index: true })
-  customerId: string; // ID de usuario o SessionID
+  userId: string; // ID de usuario o SessionID
 
   @Prop({ required: true, default: "ACTIVE", enum: ["ACTIVE", "CONVERTED", "ABANDONED"] })
   status: string;

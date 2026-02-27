@@ -8,7 +8,10 @@ export class OrderHeader {
   orderNumber: string; // Ej: ORD-2026-0001
 
   @Prop({ required: true, index: true })
-  customerId: string; // ID del usuario o referencia externa
+  userId: string; // ID del creador de la orden (Vendedor o Usuario)
+
+  @Prop({ index: true })
+  customerId?: string; // ID del cliente final B2B
 
   @Prop({ required: true, default: "PENDING", enum: ["PENDING", "MANUFACTURING", "SHIPPED", "INSTALLED", "CANCELLED"] })
   status: string;

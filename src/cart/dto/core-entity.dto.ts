@@ -16,4 +16,8 @@ export class CoreEntityDto {
   @IsOptional()
   @IsString()
   factoryId?: string;
+
+  @IsOptional()
+  @IsString()
+  customerId?: string;
 }

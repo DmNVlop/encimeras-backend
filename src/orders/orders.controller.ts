@@ -21,13 +21,7 @@ export class OrdersController {
     // para garantizar el aislamiento de datos (Multi-tenancy).
     const userId = req.user.userId;
 
-    const order = await this.ordersService.createFromDraft(
-      {
-        ...createOrderDto,
-        customerId: userId, // Sobrescribimos con identidad real del token
-      },
-      userId,
-    );
+    const order = await this.ordersService.createFromDraft(createOrderDto, userId);
     return {
       message: "Orden generada con éxito",
       orderNumber: order.header.orderNumber,

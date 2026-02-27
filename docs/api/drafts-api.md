@@ -16,9 +16,10 @@ Este módulo permite a los usuarios autenticados guardar presupuestos temporales
 | :------------------- | :------------------ | :---------------------------------------------------------- |
 | `_id`                | `ObjectId`          | Identificador único del borrador.                           |
 | `name`               | `string` (opcional) | Nombre personalizado asignado por el usuario.               |
-| `userId`             | `string`            | ID del usuario propietario.                                 |
+| `userId`             | `string`            | ID del usuario propietario (Vendedor/Comercial).            |
 | `userEmail`          | `string`            | Email para contacto/recuperación rápida.                    |
 | `core`               | `Object`            | Datos estrictos de negocio (piezas, medidas, fábrica).      |
+| `core.customerId`    | `string` (opcional) | ID del cliente final para aplicar descuentos específicos.   |
 | `uiState`            | `Object` (opcional) | Metadatos visuales opacos para el backend.                  |
 | `currentPricePoints` | `number`            | Precio final calculado (con descuento).                     |
 | `originalPoints`     | `number`            | Precio original sin aplicar descuentos.                     |
@@ -35,7 +36,7 @@ Base URL: `/drafts`
 
 ### 1. Obtener todos los borradores activos
 
-Devuelve la lista de borradores no convertidos del usuario autenticado.
+Devuelve la lista de borradores no convertidos del usuario autenticado (`userId`).
 
 - **URL**: `GET /drafts`
 - **Auth**: Requerido (JWT)
@@ -54,7 +55,8 @@ Crea un nuevo borrador con la configuración actual.
     "name": "Presupuesto Cocina XL",
     "core": {
       "mainPieces": [ ... ],
-      "factoryId": "..."
+      "factoryId": "...",
+      "customerId": "ID_DEL_CLIENTE_FINAL"
     },
     "uiState": {
       "wizardTempMaterial": { ... },

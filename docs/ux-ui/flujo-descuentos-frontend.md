@@ -11,7 +11,8 @@ Para una correcta experiencia de usuario y precisión en el precio, el frontend 
 1.  **Estado Inicial**: El presupuesto se calcula con `customerId: null`. Solo se aplican reglas de tipo `ALL`.
 2.  **Selección de Cliente**: El usuario selecciona un cliente del buscador.
 3.  **Disparo de Recálculo**: Al cambiar el `customerId`, se debe realizar una nueva llamada al endpoint de cálculo (Optimization/Budget) enviando el nuevo ID.
-4.  **Actualización de UI**: El motor devuelve un desglose detallado. **No se debe calcular nada en el frontend**; solo se debe representar el resultado del backend.
+4.  **Persistencia**: Al guardar en el Carrito o como Borrador, el `customerId` seleccionado debe incluirse dentro del objeto `core` para asegurar que el precio se mantenga consistente en futuras sesiones.
+5.  **Actualización de UI**: El motor devuelve un desglose detallado. **No se debe calcular nada en el frontend**; solo se debe representar el resultado del backend.
 
 ---
 

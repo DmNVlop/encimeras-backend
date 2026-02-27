@@ -17,11 +17,11 @@ export class CartProcessor extends WorkerHost {
   }
 
   async process(job: Job<any, any, string>): Promise<any> {
-    this.logger.log(`Procesando checkout para el cliente: ${job.data.customerId}`);
+    this.logger.log(`Procesando checkout para el usuario: ${job.data.userId}`);
 
     try {
       // Llamamos al servicio de órdenes para consolidar el carrito
-      const order = await this.ordersService.createFromCart(job.data.customerId);
+      const order = await this.ordersService.createFromCart(job.data.userId);
 
       this.logger.log(`Orden ${order.header.orderNumber} creada con éxito desde la cola.`);
 
@@ -29,12 +29,12 @@ export class CartProcessor extends WorkerHost {
         orderId: (order as any)._id,
         orderNumber: order.header.orderNumber,
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Error al procesar el checkout: ${error.message}`);
 
       this.eventsGateway.notifyOrderFailure({
         jobId: job.id || "unknown",
-        customerId: job.data.customerId,
+        userId: job.data.userId,
         message: error.message,
       });
 

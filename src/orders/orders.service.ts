@@ -23,7 +23,7 @@ export class OrdersService {
   async findAllHeaders(status?: string, ownerId?: string): Promise<any[]> {
     const query: any = {};
     if (status) query["header.status"] = status;
-    if (ownerId) query["header.customerId"] = ownerId; // Asumimos que customerId guarda el ID de usuario único
+    if (ownerId) query["header.userId"] = ownerId; // Asumimos que userId guarda el ID de usuario único
 
     return this.orderModel
       .find(query)
@@ -38,7 +38,7 @@ export class OrdersService {
    */
   async findOne(id: string, ownerId?: string): Promise<Order> {
     const query: any = { _id: id };
-    if (ownerId) query["header.customerId"] = ownerId;
+    if (ownerId) query["header.userId"] = ownerId;
 
     const order = await this.orderModel.findOne(query).lean();
 
@@ -69,7 +69,8 @@ export class OrdersService {
     const newOrder = new this.orderModel({
       header: {
         orderNumber: orderNumber,
-        customerId: createOrderDto.customerId,
+        userId: userId,
+        customerId: createOrderDto.customerId || draft.core.customerId,
         status: "PENDING",
         totalPoints: draft.currentPricePoints, // Precio congelado
         orderDate: new Date(),
@@ -140,9 +141,9 @@ export class OrdersService {
     return updatedOrder;
   }
 
-  async createFromCart(customerId: string): Promise<Order> {
+  async createFromCart(userId: string): Promise<Order> {
     // 1. Recuperar el Carrito ACTIVO
-    const cartData = await this.cartService.getOrCreateCart(customerId);
+    const cartData = await this.cartService.getOrCreateCart(userId);
 
     if (!cartData || cartData.items.length === 0) {
       throw new BadRequestException("El carrito está vacío.");
@@ -165,7 +166,8 @@ export class OrdersService {
     const newOrder = new this.orderModel({
       header: {
         orderNumber: orderNumber,
-        customerId: customerId,
+        userId: userId,
+        customerId: cartData.items.length > 0 ? cartData.items[0].core?.customerId : undefined,
         status: "PENDING",
         totalPoints: cartData.totalPoints,
         totalOriginalPoints: cartData.totalOriginalPoints || cartData.totalPoints,
@@ -179,9 +181,8 @@ export class OrdersService {
     const savedOrder = await newOrder.save();
 
     // 6. "Cerrar" el carrito (Marcar como convertido)
-    // Nota: El carrito devuelto por getOrCreateCart suele estar hidratado.
     // Usamos el modelo para actualizar status.
-    await (this.cartService as any).cartModel.findOneAndUpdate({ customerId, status: "ACTIVE" }, { status: "CONVERTED" });
+    await (this.cartService as any).cartModel.findOneAndUpdate({ userId, status: "ACTIVE" }, { status: "CONVERTED" });
 
     // 7. Notificar
     const orderObject = savedOrder.toObject();
