@@ -50,17 +50,23 @@ export class Cart {
   @Prop({ required: true, index: true })
   userId: string; // ID de usuario o SessionID
 
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: "Customer", index: true })
+  customerId?: string;
+
   @Prop({ required: true, default: "ACTIVE", enum: ["ACTIVE", "CONVERTED", "ABANDONED"] })
   status: string;
 
   @Prop({ required: true, default: 0 })
-  totalPoints: number;
+  totalPoints: number; // Este será el Total Neto (Final)
 
   @Prop({ required: true, default: 0 })
-  totalOriginalPoints: number;
+  totalOriginalPoints: number; // Este será el Total Bruto
 
   @Prop({ required: true, default: 0 })
-  totalDiscount: number;
+  totalDiscount: number; // Suma de todos los descuentos (ítems + globales)
+
+  @Prop({ type: MongooseSchema.Types.Mixed, default: [] })
+  appliedGlobalRules: any[];
 
   @Prop({ required: true })
   expiresAt: Date;

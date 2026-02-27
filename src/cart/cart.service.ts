@@ -6,6 +6,8 @@ import { AddToCartDto, UpdateCartItemDto } from "./dto/cart.dto";
 import { QuotesService } from "../quotes/quotes.service";
 import { DraftsService } from "../drafts/drafts.service";
 import { MaterialsService } from "../materials/materials.service";
+import { DiscountEngineService } from "../discount-rules/discount-engine.service";
+import { CustomersService } from "../customers/customers.service";
 import { v4 as uuidv4 } from "uuid";
 import { InjectQueue } from "@nestjs/bullmq";
 import { Queue } from "bullmq";
@@ -17,6 +19,8 @@ export class CartService {
     private readonly quotesService: QuotesService,
     private readonly draftsService: DraftsService,
     private readonly materialsService: MaterialsService,
+    private readonly discountEngineService: DiscountEngineService,
+    private readonly customersService: CustomersService,
     @InjectQueue("cart") private cartQueue: Queue,
   ) {}
 
@@ -101,7 +105,7 @@ export class CartService {
     };
 
     activeCart.items.push(cartItem);
-    this.calculateTotal(activeCart as any);
+    await this.recalculateCartTotals(activeCart as any);
 
     await activeCart.save();
     return this.getOrCreateCart(userId); // Devolvemos hidratado
@@ -115,7 +119,7 @@ export class CartService {
     if (!cart) throw new NotFoundException("Carrito no encontrado");
 
     cart.items = cart.items.filter((item) => item.cartItemId !== cartItemId);
-    this.calculateTotal(cart);
+    await this.recalculateCartTotals(cart);
 
     await cart.save();
     return this.getOrCreateCart(userId);
@@ -129,7 +133,7 @@ export class CartService {
     if (!cart) throw new NotFoundException("Carrito no encontrado");
 
     cart.items = cart.items.filter((item) => !cartItemIds.includes(item.cartItemId));
-    this.calculateTotal(cart);
+    await this.recalculateCartTotals(cart);
 
     await cart.save();
     return this.getOrCreateCart(userId);
@@ -172,7 +176,7 @@ export class CartService {
       };
     }
 
-    this.calculateTotal(cart);
+    await this.recalculateCartTotals(cart);
 
     await cart.save();
     return this.getOrCreateCart(userId);
@@ -252,15 +256,94 @@ export class CartService {
       activeCart.items.push(cartItem);
     }
 
-    this.calculateTotal(activeCart as any);
+    await this.recalculateCartTotals(activeCart as any);
     await activeCart.save();
     return this.getOrCreateCart(userId);
   }
 
+  /**
+   * Asigna un cliente al carrito y recalcula los totales
+   */
+  async assignCustomer(userId: string, customerId: string): Promise<any> {
+    const cart = await this.cartModel.findOne({ userId, status: "ACTIVE" }).exec();
+    if (!cart) throw new NotFoundException("Carrito no encontrado");
+
+    // Validar cliente
+    const customer = await this.customersService.findById(customerId);
+    if (!customer) throw new NotFoundException("Cliente no encontrado");
+
+    cart.customerId = customerId;
+
+    await this.recalculateCartTotals(cart);
+    await cart.save();
+
+    return this.getOrCreateCart(userId);
+  }
+
+  /**
+   * Recalcula los totales del carrito aplicando reglas globales
+   */
+  private async recalculateCartTotals(cart: CartDocument) {
+    if (!cart.items || cart.items.length === 0) {
+      cart.totalPoints = 0;
+      cart.totalOriginalPoints = 0;
+      cart.totalDiscount = 0;
+      cart.appliedGlobalRules = [];
+      return;
+    }
+
+    // 1. Obtener todos los ítems base brutos para el motor de descuentos
+    const allPieces: any[] = [];
+    let grossTotal = 0;
+
+    for (const item of cart.items) {
+      // Usamos el QuotesService para obtener los precios brutos de cada pieza
+      // IMPORTANTE: Calculamos sin descuentos individuales para que el motor global decida
+      const calculation = await this.quotesService.calculate({
+        mainPieces: item.core.mainPieces,
+        factoryId: item.core.factoryId,
+        customerId: cart.customerId || item.core.customerId,
+      });
+
+      // Mapeamos las piezas al formato del motor
+      calculation.pieces.forEach((p: any) => {
+        allPieces.push({
+          id: p.materialId,
+          name: p.pieceName,
+          category: p.materialCategory,
+          price: p.subtotalPoints, // Precio bruto calculado por QuotesService
+          quantity: 1,
+        });
+        grossTotal += p.subtotalPoints;
+      });
+
+      // Actualizamos el ítem del carrito con su subtotal bruto (momentáneo)
+      item.originalPoints = calculation.totalPoints;
+      item.subtotalPoints = calculation.totalPoints;
+      item.discountAmount = 0;
+      item.appliedRules = [];
+    }
+
+    // 2. Ejecutar el motor de descuentos global
+    // Necesitamos un factoryId. Si no hay uno global en el carrito, usamos el del primer ítem
+    const factoryId = (cart.items[0].core as any).factoryId;
+
+    const discountResult = await this.discountEngineService.calculateDiscounts(allPieces, factoryId, cart.customerId);
+
+    // 3. Repartir los descuentos de vuelta (si es necesario por ítem o dejarlo global)
+    // En el plan, decidimos que el carrito muestra Ahorro Total.
+    cart.totalOriginalPoints = grossTotal;
+    cart.totalPoints = discountResult.finalTotal;
+    cart.totalDiscount = discountResult.totalDiscount;
+    cart.appliedGlobalRules = discountResult.appliedRules;
+
+    // Opcional: Podríamos recalcular los subtotales de los ítems si quisiéramos
+    // Pero según el doc logica-cliente-carrito.md, el front prefiere ver precios brutos y un ahorro global.
+  }
+
   private calculateTotal(cart: CartDocument) {
-    cart.totalPoints = cart.items.reduce((sum, item) => sum + item.subtotalPoints, 0);
-    cart.totalOriginalPoints = cart.items.reduce((sum, item) => sum + (item.originalPoints || item.subtotalPoints), 0);
-    cart.totalDiscount = cart.items.reduce((sum, item) => sum + (item.discountAmount || 0), 0);
+    // Método antiguo, ahora usamos recalculateCartTotals
+    this.recalculateCartTotals(cart);
   }
 
   /**

@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Param, Delete, Put, UseGuards, Req } from "@nestjs/common";
 import { CartService } from "./cart.service";
-import { AddToCartDto, UpdateCartItemDto, RemoveItemsDto, ImportGroupDto } from "./dto/cart.dto";
+import { AddToCartDto, UpdateCartItemDto, RemoveItemsDto, ImportGroupDto, AssignCustomerDto } from "./dto/cart.dto";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 
@@ -16,6 +16,14 @@ export class CartController {
   async getCart(@Req() req) {
     // Usamos el ID del usuario del JWT
     return this.cartService.getOrCreateCart(req.user.userId);
+  }
+
+  @Post("customer")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Asignar un cliente al carrito para calcular descuentos" })
+  async assignCustomer(@Req() req, @Body() assignCustomerDto: AssignCustomerDto) {
+    return this.cartService.assignCustomer(req.user.userId, assignCustomerDto.customerId);
   }
 
   @Post("items")

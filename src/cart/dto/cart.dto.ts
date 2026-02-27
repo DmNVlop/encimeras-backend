@@ -54,3 +54,9 @@ export class ImportGroupDto {
   @IsNotEmpty()
   clearFirst?: boolean;
 }
+
+export class AssignCustomerDto {
+  @IsString()
+  @IsNotEmpty()
+  customerId: string;
+}
