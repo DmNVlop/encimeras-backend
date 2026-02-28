@@ -152,14 +152,16 @@ export class OrdersService {
     // 2. Generar ID Secuencial
     const orderNumber = await this.generateOrderNumber();
 
-    // 3. Mapear cada CartItem a un OrderLineItem para trazabilidad
-    const orderItems = cartData.items.map((item) => ({
+    // 3. Mapear cada CartItem a un OrderLineItem — snapshot inmutable completo
+    const orderItems = cartData.items.map((item: any) => ({
       type: "COUNTERTOP_PROJECT",
       cartItemName: item.customName, // Trazabilidad: "Cocina de Juana"
       core: item.core,
       uiState: item.uiState,
-      originalPoints: (item as any).originalPoints || item.subtotalPoints,
-      discountAmount: (item as any).discountAmount || 0,
+      originalPoints: item.originalPoints || item.subtotalPoints,
+      discountAmount: item.discountAmount || 0,
+      subtotalPoints: item.subtotalPoints, // ← Precio final con descuento por ítem
+      appliedRules: item.appliedRules || [], // ← Reglas de descuento aplicadas al ítem
     }));
 
     // 4. Crear la Orden Unificada
@@ -167,7 +169,7 @@ export class OrdersService {
       header: {
         orderNumber: orderNumber,
         userId: userId,
-        customerId: cartData.items.length > 0 ? cartData.items[0].core?.customerId : undefined,
+        customerId: cartData.customerId ?? (cartData.items.length > 0 ? cartData.items[0].core?.customerId : undefined),
         status: "PENDING",
         totalPoints: cartData.totalPoints,
         totalOriginalPoints: cartData.totalOriginalPoints || cartData.totalPoints,
@@ -175,6 +177,7 @@ export class OrdersService {
         orderDate: new Date(),
       },
       items: orderItems,
+      appliedGlobalRules: cartData.appliedGlobalRules || [], // ← Reglas globales de descuento del carrito
     });
 
     // 5. Guardar Orden

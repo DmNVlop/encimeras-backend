@@ -56,6 +56,12 @@ export class OrderLineItem {
 
   @Prop({ required: true, default: 0 })
   discountAmount: number;
+
+  @Prop({ required: true, default: 0 })
+  subtotalPoints: number; // Precio final con descuento de ítem aplicado
+
+  @Prop({ type: MongooseSchema.Types.Mixed, default: [] })
+  appliedRules: any[]; // Reglas de descuento aplicadas a este ítem
 }
 
 @Schema({ timestamps: true })
@@ -65,6 +71,9 @@ export class Order extends Document {
 
   @Prop({ type: [OrderLineItem], required: true })
   items: OrderLineItem[];
+
+  @Prop({ type: MongooseSchema.Types.Mixed, default: [] })
+  appliedGlobalRules: any[]; // Reglas de descuento globales del carrito al momento del checkout
 
   // Referencia al borrador original (trazabilidad)
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: "Draft" })
