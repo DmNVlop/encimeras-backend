@@ -46,7 +46,7 @@ export class OrdersService {
       throw new NotFoundException(`La orden con ID ${id} no existe o no tienes permiso para verla.`);
     }
 
-    return order as Order;
+    return order as unknown as Order;
   }
 
   async createFromDraft(createOrderDto: CreateOrderDto, userId: string): Promise<Order> {
