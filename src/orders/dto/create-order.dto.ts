@@ -8,8 +8,8 @@ export class CreateOrderDto {
   draftId: string; // Obligatorio: la orden SIEMPRE nace de un borrador validado
 
   @IsString()
-  @IsNotEmpty()
-  customerId: string;
+  @IsOptional()
+  customerId?: string;
 
   // Información de contacto/envío adicional si no está en el perfil
   @IsOptional()

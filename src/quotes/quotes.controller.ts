@@ -6,8 +6,13 @@ import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 import { QuotesService } from "./quotes.service";
 
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
+import { Role } from "../auth/enums/role.enum";
+
 @ApiTags("Quotes")
 @Controller("quotes")
+@UseGuards(RolesGuard)
 export class QuotesController {
   constructor(private readonly quotesService: QuotesService) {}
 
@@ -30,32 +35,36 @@ export class QuotesController {
   // --- PROTECTED ADMIN ENDPOINTS ---
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
+  @Roles(Role.ADMIN, Role.SALES)
   @Get()
-  @ApiOperation({ summary: "Get all quotes (Admin)" })
+  @ApiOperation({ summary: "Get all quotes (Admin & Sales)" })
   findAll() {
     return this.quotesService.findAll();
   }
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
+  @Roles(Role.ADMIN, Role.SALES)
   @Get(":id")
-  @ApiOperation({ summary: "Get a single quote by ID (Admin)" })
+  @ApiOperation({ summary: "Get a single quote by ID (Admin & Sales)" })
   findOne(@Param("id") id: string) {
     return this.quotesService.findOne(id);
   }
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
+  @Roles(Role.ADMIN, Role.SALES)
   @Patch(":id")
-  @ApiOperation({ summary: "Update a quote status (Admin)" })
+  @ApiOperation({ summary: "Update a quote status (Admin & Sales)" })
   update(@Param("id") id: string, @Body() status: { status: string }) {
     return this.quotesService.update(id, status);
   }
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
+  @Roles(Role.ADMIN)
   @Delete(":id")
-  @ApiOperation({ summary: "Delete a quote (Admin)" })
+  @ApiOperation({ summary: "Delete a quote (Solo Admin)" })
   remove(@Param("id") id: string) {
     return this.quotesService.remove(id);
   }

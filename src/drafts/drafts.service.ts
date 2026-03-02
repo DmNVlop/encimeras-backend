@@ -24,8 +24,27 @@ export class DraftsService {
     const expirationDate = new Date();
     expirationDate.setDate(expirationDate.getDate() + validityDays);
 
+    let finalCurrentPrice = createDraftDto.currentPricePoints;
+    let finalOriginalPrice = createDraftDto.originalPoints;
+    let finalDiscount = createDraftDto.discountAmount;
+
+    // Si no vienen los precios calculados, los calculamos en el backend (ROBUSTEZ)
+    if (finalCurrentPrice === undefined || finalCurrentPrice === null) {
+      const calculation = await this.pricingService.calculate({
+        mainPieces: createDraftDto.core.mainPieces as any,
+        factoryId: createDraftDto.core.factoryId,
+        customerId: createDraftDto.core.customerId || userId,
+      });
+      finalCurrentPrice = Number.isFinite(calculation.finalTotalPoints) ? calculation.finalTotalPoints : 0;
+      finalOriginalPrice = Number.isFinite(calculation.totalPoints) ? calculation.totalPoints : finalCurrentPrice;
+      finalDiscount = Number.isFinite(calculation.totalDiscount) ? calculation.totalDiscount : 0;
+    }
+
     const newDraft = new this.draftModel({
       ...createDraftDto,
+      currentPricePoints: finalCurrentPrice,
+      originalPoints: finalOriginalPrice ?? finalCurrentPrice,
+      discountAmount: finalDiscount ?? 0,
       userId: userId || null,
       expirationDate,
       isConverted: false,
@@ -68,14 +87,18 @@ export class DraftsService {
     }
 
     // CASO B: El borrador ha CADUCADO -> Recálculo Obligatorio
-    // Usamos mainPieces para recalcular
+    // Usamos core para recalcular
     const calculation = await this.pricingService.calculate({
-      mainPieces: draft.configuration.mainPieces,
+      mainPieces: draft.core.mainPieces,
+      factoryId: draft.core.factoryId,
+      customerId: draft.core.customerId || draft.userId,
     });
 
     // Actualizamos el precio en el borrador (pero no la fecha, sigue expirado hasta que el usuario guarde de nuevo)
-    const safePoints = Number.isFinite(calculation.totalPoints) ? calculation.totalPoints : 0;
+    const safePoints = Number.isFinite(calculation.finalTotalPoints) ? calculation.finalTotalPoints : 0;
     draft.currentPricePoints = safePoints;
+    draft.originalPoints = calculation.totalPoints;
+    draft.discountAmount = calculation.totalDiscount;
     await draft.save();
 
     return {
@@ -93,10 +116,29 @@ export class DraftsService {
     const newExpirationDate = new Date();
     newExpirationDate.setDate(newExpirationDate.getDate() + validityDays);
 
+    let finalCurrentPrice = updateDraftDto.currentPricePoints;
+    let finalOriginalPrice = updateDraftDto.originalPoints;
+    let finalDiscount = updateDraftDto.discountAmount;
+
+    // Si no vienen los precios calculados, los calculamos en el backend (ROBUSTEZ)
+    if (finalCurrentPrice === undefined || finalCurrentPrice === null) {
+      const calculation = await this.pricingService.calculate({
+        mainPieces: updateDraftDto.core.mainPieces as any,
+        factoryId: updateDraftDto.core.factoryId,
+        customerId: updateDraftDto.core.customerId || userId,
+      });
+      finalCurrentPrice = Number.isFinite(calculation.finalTotalPoints) ? calculation.finalTotalPoints : 0;
+      finalOriginalPrice = Number.isFinite(calculation.totalPoints) ? calculation.totalPoints : finalCurrentPrice;
+      finalDiscount = Number.isFinite(calculation.totalDiscount) ? calculation.totalDiscount : 0;
+    }
+
     const updatedDraft = await this.draftModel.findOneAndUpdate(
       { _id: id, userId },
       {
         ...updateDraftDto,
+        currentPricePoints: finalCurrentPrice,
+        originalPoints: finalOriginalPrice ?? finalCurrentPrice,
+        discountAmount: finalDiscount ?? 0,
         expirationDate: newExpirationDate,
       },
       { new: true }, // Para que devuelva el documento ya actualizado
@@ -115,6 +157,10 @@ export class DraftsService {
 
   async findAllActive(userId: string): Promise<Draft[]> {
     return this.draftModel.find({ userId, isConverted: false }).lean().exec() as any;
+  }
+
+  async findAllByGroupId(groupId: string, userId: string): Promise<Draft[]> {
+    return this.draftModel.find({ cartGroupId: groupId, userId, isConverted: false }).lean().exec() as any;
   }
 
   async delete(id: string, userId: string): Promise<void> {

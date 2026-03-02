@@ -17,20 +17,11 @@ export class OrdersController {
   @Post()
   @Roles(Role.USER, Role.SALES, Role.ADMIN)
   async convertToOrder(@Body() createOrderDto: CreateOrderDto, @Request() req) {
-    // Sobrescribimos el customerId con el usuario real del token para evitar fraudes
-    // - userId: ID de Mongo del usuario (para verificar propiedad del borrador)
-    // - customerId: Email/Username visible (para guardar en el header de la orden)
+    // 🔥 SEGURIDAD: Usamos obligatoriamente el userId del token como customerId
+    // para garantizar el aislamiento de datos (Multi-tenancy).
     const userId = req.user.userId;
-    const customerIdentifier = req.user.username || req.user.email || req.user.userId;
 
-    // Este endpoint "quema" el borrador y crea la orden con el Shared-Header
-    const order = await this.ordersService.createFromDraft(
-      {
-        ...createOrderDto,
-        customerId: customerIdentifier,
-      },
-      userId,
-    );
+    const order = await this.ordersService.createFromDraft(createOrderDto, userId);
     return {
       message: "Orden generada con éxito",
       orderNumber: order.header.orderNumber,
@@ -41,22 +32,27 @@ export class OrdersController {
   // 2. Ver todas las órdenes: Solo Admin y Ventas
   @Get()
   @Roles(Role.ADMIN, Role.SALES, Role.USER)
-  async listAll(@Query("status") status?: string) {
-    // Endpoint para el Admin Panel
-    // Solo devuelve los Headers para optimizar la carga del DataGrid [cite: 29]
-    return this.ordersService.findAllHeaders(status);
+  async listAll(@Query("status") status?: string, @Request() req?: any) {
+    const user = req.user;
+    // Si es USER, solo puede ver sus propias órdenes
+    const ownerId = user.roles.includes(Role.ADMIN) || user.roles.includes(Role.SALES) ? undefined : user.userId;
+
+    return this.ordersService.findAllHeaders(status, ownerId);
   }
 
   // 3. Aprobar Orden: SOLO Admin (o Ventas si decides darle poder)
   @Get(":id")
   @Roles(Role.ADMIN, Role.SALES, Role.USER)
-  async getDetail(@Param("id") id: string) {
-    // Devuelve la orden completa incluyendo el TechnicalSnapshot para producción
-    return this.ordersService.findOne(id);
+  async getDetail(@Param("id") id: string, @Request() req?: any) {
+    const user = req.user;
+    // Si no es admin/sales, pasamos el userId para validar propiedad
+    const ownerId = user.roles.includes(Role.ADMIN) || user.roles.includes(Role.SALES) ? undefined : user.userId;
+
+    return this.ordersService.findOne(id, ownerId);
   }
 
   @Patch(":id/status")
-  @Roles(Role.ADMIN, Role.SALES, Role.USER)
+  @Roles(Role.ADMIN, Role.SALES, Role.WORKER) // 🔥 USER fuera: Un cliente no puede marcar su orden como pagada
   async updateStatus(@Param("id") id: string, @Body() updateOrderStatusDto: UpdateOrderStatusDto) {
     return this.ordersService.updateStatus(id, updateOrderStatusDto.status);
   }

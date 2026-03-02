@@ -12,16 +12,21 @@ Este módulo permite a los usuarios autenticados guardar presupuestos temporales
 
 ## Modelo de Datos (Draft)
 
-| Campo                | Tipo                | Descripción                                                |
-| :------------------- | :------------------ | :--------------------------------------------------------- |
-| `_id`                | `ObjectId`          | Identificador único del borrador.                          |
-| `name`               | `string` (opcional) | Nombre personalizado asignado por el usuario.              |
-| `userId`             | `string`            | ID del usuario propietario.                                |
-| `userEmail`          | `string`            | Email para contacto/recuperación rápida.                   |
-| `configuration`      | `Object`            | Estado completo del presupuesto (materiales, piezas, etc). |
-| `currentPricePoints` | `number`            | Precio calculado al momento de guardar.                    |
-| `expirationDate`     | `Date`              | Fecha límite de validez del presupuesto.                   |
-| `isConverted`        | `boolean`           | Indica si el borrador ya se convirtió en pedido.           |
+| Campo                | Tipo                | Descripción                                                 |
+| :------------------- | :------------------ | :---------------------------------------------------------- |
+| `_id`                | `ObjectId`          | Identificador único del borrador.                           |
+| `name`               | `string` (opcional) | Nombre personalizado asignado por el usuario.               |
+| `userId`             | `string`            | ID del usuario propietario (Vendedor/Comercial).            |
+| `userEmail`          | `string`            | Email para contacto/recuperación rápida.                    |
+| `core`               | `Object`            | Datos estrictos de negocio (piezas, medidas, fábrica).      |
+| `core.customerId`    | `string` (opcional) | ID del cliente final para aplicar descuentos específicos.   |
+| `uiState`            | `Object` (opcional) | Metadatos visuales opacos para el backend.                  |
+| `currentPricePoints` | `number`            | Precio final calculado (con descuento).                     |
+| `originalPoints`     | `number`            | Precio original sin aplicar descuentos.                     |
+| `discountAmount`     | `number`            | Importe total descontado en este borrador.                  |
+| `expirationDate`     | `Date`              | Fecha límite de validez del presupuesto.                    |
+| `isConverted`        | `boolean`           | Indica si el borrador ya se convirtió en pedido.            |
+| `cartGroupId`        | `string` (opcional) | ID de agrupación para múltiples presupuestos en un carrito. |
 
 ---
 
@@ -31,7 +36,7 @@ Base URL: `/drafts`
 
 ### 1. Obtener todos los borradores activos
 
-Devuelve la lista de borradores no convertidos del usuario autenticado.
+Devuelve la lista de borradores no convertidos del usuario autenticado (`userId`).
 
 - **URL**: `GET /drafts`
 - **Auth**: Requerido (JWT)
@@ -44,17 +49,22 @@ Crea un nuevo borrador con la configuración actual.
 - **URL**: `POST /drafts`
 - **Auth**: Requerido (JWT)
 - **Body**:
+
   ```json
   {
     "name": "Presupuesto Cocina XL",
-    "userEmail": "usuario@ejemplo.com",
-    "configuration": {
-      "wizardTempMaterial": { ... },
-      "mainPieces": [ ... ]
+    "core": {
+      "mainPieces": [ ... ],
+      "factoryId": "...",
+      "customerId": "ID_DEL_CLIENTE_FINAL"
     },
-    "currentPricePoints": 1250.50
+    "uiState": {
+      "wizardTempMaterial": { ... },
+      "lastStep": 3
+    }
   }
   ```
+
 - **Respuesta** (201 Created):
   ```json
   {
@@ -75,8 +85,13 @@ Obtiene los detalles de un borrador específico. Maneja la lógica de expiració
   {
     "status": "VALID", // o "EXPIRED_RECALCULATED"
     "message": "Borrador recuperado",
-    "data": { ... }, // Objeto Draft completo
-    "newPrice": null // Solo tendrá valor si status es EXPIRED_RECALCULATED
+    "data": {
+      "currentPricePoints": 1300,
+      "originalPoints": 1500,
+      "discountAmount": 200,
+      "...": "..."
+    },
+    "newPrice": 1300 // Solo tendrá valor si status es EXPIRED_RECALCULATED (es el finalTotal)
   }
   ```
   > **Nota para Frontend**: Si el `status` es `EXPIRED_RECALCULATED`, se debe mostrar un aviso al usuario indicando que los precios han sido actualizados a la tarifa vigente.
@@ -115,3 +130,4 @@ Modifica un borrador existente y renueva su fecha de expiración.
 1. **Guardado**: Ofrecer al usuario un campo de texto opcional para nombrar su presupuesto antes de hacer el POST a `/drafts`.
 2. **Listado**: En el área de usuario, mostrar la lista de borradores con su nombre y fecha de expiración.
 3. **Carga**: Al seleccionar un borrador, navegar a `/drafts/:id`. Si la respuesta contiene `EXPIRED_RECALCULATED`, notificar al usuario el cambio de precio mediante un Toast o Banner informativo.
+4. **Grupos**: Si el borrador cargado tiene un `cartGroupId`, sugerir al usuario cargar el resto de elementos del conjunto para completar el proyecto.

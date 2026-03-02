@@ -33,4 +33,11 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   notifyOrderUpdate(orderHeaderWithId: any) {
     this.server.emit("orders:update", orderHeaderWithId);
   }
+
+  /**
+   * Notifica un fallo en el procesamiento asíncrono de una orden
+   */
+  notifyOrderFailure(payload: { jobId: string; userId: string; message: string }) {
+    this.server.emit("orders:fail", payload);
+  }
 }

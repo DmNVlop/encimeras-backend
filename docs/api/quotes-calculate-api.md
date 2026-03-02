@@ -144,6 +144,7 @@ Es importante que el equipo de Frontend entienda el orden de operaciones para mo
     - Se modifiquen medidas (`length_mm`, `width_mm`).
     - Se añadan/quiten addons.
     - **Novedad**: Se seleccione un cliente diferente en el buscador de clientes.
+4.  **Persistencia en Carrito/Borrador**: Cuando se guarda un presupuesto, el `customerId` seleccionado debe viajar dentro del objeto `core` para que el backend lo use en futuros recálculos automáticos. (Ej: `core: { ..., customerId: "..." }`).
 
 ---
 

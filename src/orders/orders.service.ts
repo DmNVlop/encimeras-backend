@@ -1,10 +1,11 @@
-import { Injectable, BadRequestException, NotFoundException } from "@nestjs/common";
+import { Injectable, BadRequestException, NotFoundException, Inject, forwardRef } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { Model } from "mongoose";
+import { HydratedDocument, Model } from "mongoose";
 import { Order } from "./schemas/order.schema";
 import { CreateOrderDto } from "./dto/create-order.dto";
 import { DraftsService } from "../drafts/drafts.service";
 import { EventsGateway } from "../events/events.gateway";
+import { CartService } from "../cart/cart.service";
 
 @Injectable()
 export class OrdersService {
@@ -12,14 +13,17 @@ export class OrdersService {
     @InjectModel(Order.name) private orderModel: Model<Order>,
     private draftsService: DraftsService,
     private eventsGateway: EventsGateway,
+    private cartService: CartService,
   ) {}
 
   /**
    * Obtiene todas las órdenes pero filtrando solo el "Shared Header".
-   * Esto optimiza el rendimiento del Panel de Administración (DataGrid).
+   * Si se pasa ownerId, se filtra para que el usuario solo vea lo suyo.
    */
-  async findAllHeaders(status?: string): Promise<any[]> {
-    const query = status ? { "header.status": status } : {};
+  async findAllHeaders(status?: string, ownerId?: string): Promise<any[]> {
+    const query: any = {};
+    if (status) query["header.status"] = status;
+    if (ownerId) query["header.userId"] = ownerId; // Asumimos que userId guarda el ID de usuario único
 
     return this.orderModel
       .find(query)
@@ -30,13 +34,16 @@ export class OrdersService {
 
   /**
    * Obtiene el detalle completo de una orden, incluyendo el technicalSnapshot.
-   * Se usa cuando el administrador entra en la ficha de producción.
+   * Se añade validación de propiedad si se proporciona ownerId (para rol USER).
    */
-  async findOne(id: string): Promise<Order> {
-    const order = await this.orderModel.findById(id).lean();
+  async findOne(id: string, ownerId?: string): Promise<Order> {
+    const query: any = { _id: id };
+    if (ownerId) query["header.userId"] = ownerId;
+
+    const order = await this.orderModel.findOne(query).lean();
 
     if (!order) {
-      throw new NotFoundException(`La orden con ID ${id} no existe.`);
+      throw new NotFoundException(`La orden con ID ${id} no existe o no tienes permiso para verla.`);
     }
 
     return order as Order;
@@ -62,7 +69,8 @@ export class OrdersService {
     const newOrder = new this.orderModel({
       header: {
         orderNumber: orderNumber,
-        customerId: createOrderDto.customerId,
+        userId: userId,
+        customerId: createOrderDto.customerId || draft.core.customerId,
         status: "PENDING",
         totalPoints: draft.currentPricePoints, // Precio congelado
         orderDate: new Date(),
@@ -71,17 +79,18 @@ export class OrdersService {
       items: [
         {
           type: "COUNTERTOP_PROJECT",
-          technicalSnapshot: {
-            // Copia profunda del estado del QuoteContext
-            materials: [draft.configuration.wizardTempMaterial],
-            pieces: draft.configuration.mainPieces,
-            // Asumiendo que guardaste addons globales o por pieza
-            addons: draft.configuration.globalAddons || [],
-          },
+          cartItemName: draft.name || "Proyecto desde Borrador",
+          core: draft.core,
+          uiState: draft.uiState,
+          originalPoints: (draft as any).originalPoints || draft.currentPricePoints,
+          discountAmount: (draft as any).discountAmount || 0,
         },
       ],
       originDraftId: draft._id,
     });
+
+    newOrder.header.totalOriginalPoints = (draft as any).originalPoints || draft.currentPricePoints;
+    newOrder.header.totalDiscount = (draft as any).discountAmount || 0;
 
     // 5. Guardar Orden y "Quemar" el Borrador
     const savedOrder = await newOrder.save();
@@ -130,6 +139,63 @@ export class OrdersService {
     this.eventsGateway.notifyOrderUpdate(socketPayload);
 
     return updatedOrder;
+  }
+
+  async createFromCart(userId: string): Promise<Order> {
+    // 1. Recuperar el Carrito ACTIVO
+    const cartData = await this.cartService.getOrCreateCart(userId);
+
+    if (!cartData || cartData.items.length === 0) {
+      throw new BadRequestException("El carrito está vacío.");
+    }
+
+    // 2. Generar ID Secuencial
+    const orderNumber = await this.generateOrderNumber();
+
+    // 3. Mapear cada CartItem a un OrderLineItem — snapshot inmutable completo
+    const orderItems = cartData.items.map((item: any) => ({
+      type: "COUNTERTOP_PROJECT",
+      cartItemName: item.customName, // Trazabilidad: "Cocina de Juana"
+      core: item.core,
+      uiState: item.uiState,
+      originalPoints: item.originalPoints || item.subtotalPoints,
+      discountAmount: item.discountAmount || 0,
+      subtotalPoints: item.subtotalPoints, // ← Precio final con descuento por ítem
+      appliedRules: item.appliedRules || [], // ← Reglas de descuento aplicadas al ítem
+    }));
+
+    // 4. Crear la Orden Unificada
+    const newOrder = new this.orderModel({
+      header: {
+        orderNumber: orderNumber,
+        userId: userId,
+        customerId: cartData.customerId ?? (cartData.items.length > 0 ? cartData.items[0].core?.customerId : undefined),
+        status: "PENDING",
+        totalPoints: cartData.totalPoints,
+        totalOriginalPoints: cartData.totalOriginalPoints || cartData.totalPoints,
+        totalDiscount: cartData.totalDiscount || 0,
+        orderDate: new Date(),
+      },
+      items: orderItems,
+      appliedGlobalRules: cartData.appliedGlobalRules || [], // ← Reglas globales de descuento del carrito
+    });
+
+    // 5. Guardar Orden
+    const savedOrder = await newOrder.save();
+
+    // 6. "Cerrar" el carrito (Marcar como convertido)
+    // Usamos el modelo para actualizar status.
+    await (this.cartService as any).cartModel.findOneAndUpdate({ userId, status: "ACTIVE" }, { status: "CONVERTED" });
+
+    // 7. Notificar
+    const orderObject = savedOrder.toObject();
+    const payload = {
+      ...orderObject.header,
+      _id: orderObject._id,
+    };
+    this.eventsGateway.notifyNewOrder(payload);
+
+    return savedOrder;
   }
 
   // Helper para generar IDs tipo "ORD-2026-0045"

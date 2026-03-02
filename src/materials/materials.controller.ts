@@ -7,8 +7,13 @@ import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { DeleteMaterialsDto } from "./dto/delete-material.dto";
 
+import { RolesGuard } from "src/auth/guards/roles.guard";
+import { Roles } from "src/auth/decorators/roles.decorator";
+import { Role } from "src/auth/enums/role.enum";
+
 @ApiTags("Materials")
 @Controller("materials")
+@UseGuards(RolesGuard) // Aplicamos RolesGuard a nivel de controlador
 export class MaterialsController {
   constructor(private readonly materialsService: MaterialsService) {}
 
@@ -25,27 +30,30 @@ export class MaterialsController {
   }
 
   @Post()
-  @ApiOperation({ summary: "Crear un nuevo material (Protegido)" })
-  @ApiBearerAuth() // Esto le dice a Swagger que este endpoint requiere un token
+  @ApiOperation({ summary: "Crear un nuevo material (Solo Admin)" })
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
+  @Roles(Role.ADMIN)
   @UsePipes(new ValidationPipe({ whitelist: true }))
   create(@Body() createMaterialDto: CreateMaterialDto) {
     return this.materialsService.create(createMaterialDto);
   }
 
   @Patch(":id")
-  @ApiOperation({ summary: "Actualizar un material (Protegido)" })
-  @ApiBearerAuth() // Esto le dice a Swagger que este endpoint requiere un token
+  @ApiOperation({ summary: "Actualizar un material (Solo Admin)" })
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
+  @Roles(Role.ADMIN)
   @UsePipes(new ValidationPipe({ whitelist: true }))
   update(@Param("id") id: string, @Body() updateMaterialDto: UpdateMaterialDto) {
     return this.materialsService.update(id, updateMaterialDto);
   }
 
   @Delete()
-  @ApiOperation({ summary: "Eliminar uno o más materiales (Protegido)" })
+  @ApiOperation({ summary: "Eliminar uno o más materiales (Solo Admin)" })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
+  @Roles(Role.ADMIN)
   remove(@Body() deleteMaterialsDto: DeleteMaterialsDto) {
     return this.materialsService.remove(deleteMaterialsDto.ids);
   }
@@ -53,9 +61,10 @@ export class MaterialsController {
   // Mantenemos el endpoint antiguo por si se necesita para un borrado simple,
   // aunque la nueva lógica ya lo cubre.
   @Delete(":id")
-  @ApiOperation({ summary: "Eliminar un material por ID (Protegido)" })
+  @ApiOperation({ summary: "Eliminar un material por ID (Solo Admin)" })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
+  @Roles(Role.ADMIN)
   removeOne(@Param("id") id: string) {
     return this.materialsService.remove([id]);
   }

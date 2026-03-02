@@ -24,7 +24,7 @@ class AppliedAddonDto {
 }
 
 // 2. DTO para cada Pieza Principal
-class MainPieceDto {
+export class MainPieceDto {
   @ApiProperty({ description: "ID temporal del frontend (opcional)", required: false })
   @IsOptional()
   id?: string;

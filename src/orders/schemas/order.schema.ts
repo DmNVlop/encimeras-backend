@@ -8,13 +8,22 @@ export class OrderHeader {
   orderNumber: string; // Ej: ORD-2026-0001
 
   @Prop({ required: true, index: true })
-  customerId: string; // ID del usuario o referencia externa
+  userId: string; // ID del creador de la orden (Vendedor o Usuario)
+
+  @Prop({ index: true })
+  customerId?: string; // ID del cliente final B2B
 
   @Prop({ required: true, default: "PENDING", enum: ["PENDING", "MANUFACTURING", "SHIPPED", "INSTALLED", "CANCELLED"] })
   status: string;
 
   @Prop({ required: true })
-  totalPoints: number; // Valor inmutable
+  totalPoints: number; // Valor inmutable final
+
+  @Prop({ required: true, default: 0 })
+  totalOriginalPoints: number;
+
+  @Prop({ required: true, default: 0 })
+  totalDiscount: number;
 
   @Prop({ required: true })
   orderDate: Date;
@@ -29,14 +38,30 @@ export class OrderLineItem {
   @Prop({ required: true, default: "COUNTERTOP_PROJECT" })
   type: string;
 
+  @Prop({ required: true })
+  cartItemName: string; // Ej: "Cocina de Juana", "Isla de Tomás"
+
   @Prop({ type: MongooseSchema.Types.Mixed, required: true })
-  technicalSnapshot: {
-    // Copia profunda de lo que se va a fabricar.
-    // Incluye layout 3D, materiales y cortes exactos.
-    materials: any[];
-    pieces: any[]; // MainPieces con medidas finales
-    addons: any[]; // Accesorios aplicados
+  core: {
+    mainPieces: any[];
+    factoryId?: string;
+    [key: string]: any;
   };
+
+  @Prop({ type: MongooseSchema.Types.Mixed })
+  uiState?: Record<string, any>;
+
+  @Prop({ required: true, default: 0 })
+  originalPoints: number;
+
+  @Prop({ required: true, default: 0 })
+  discountAmount: number;
+
+  @Prop({ required: true, default: 0 })
+  subtotalPoints: number; // Precio final con descuento de ítem aplicado
+
+  @Prop({ type: MongooseSchema.Types.Mixed, default: [] })
+  appliedRules: any[]; // Reglas de descuento aplicadas a este ítem
 }
 
 @Schema({ timestamps: true })
@@ -46,6 +71,9 @@ export class Order extends Document {
 
   @Prop({ type: [OrderLineItem], required: true })
   items: OrderLineItem[];
+
+  @Prop({ type: MongooseSchema.Types.Mixed, default: [] })
+  appliedGlobalRules: any[]; // Reglas de descuento globales del carrito al momento del checkout
 
   // Referencia al borrador original (trazabilidad)
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: "Draft" })

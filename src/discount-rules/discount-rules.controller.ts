@@ -26,16 +26,16 @@ export class DiscountRulesController {
   }
 
   @Get()
-  @Roles(Role.ADMIN)
-  @ApiOperation({ summary: "List all active discount rules" })
+  @Roles(Role.ADMIN, Role.SALES)
+  @ApiOperation({ summary: "List all active discount rules (Admin & Sales)" })
   findAll(@GetUser("factoryId") factoryId: string) {
     const fid = factoryId || "000000000000000000000000";
     return this.discountRulesService.findAll(fid);
   }
 
   @Get(":id")
-  @Roles(Role.ADMIN)
-  @ApiOperation({ summary: "Get discount rule details" })
+  @Roles(Role.ADMIN, Role.SALES)
+  @ApiOperation({ summary: "Get discount rule details (Admin & Sales)" })
   findOne(@Param("id") id: string, @GetUser("factoryId") factoryId: string) {
     const fid = factoryId || "000000000000000000000000";
     return this.discountRulesService.findOne(id, fid);

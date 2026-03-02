@@ -5,10 +5,23 @@ import { OrdersController } from "./orders.controller";
 import { OrdersService } from "./orders.service";
 import { DraftsModule } from "src/drafts/drafts.module";
 import { EventsModule } from "src/events/events.module";
+import { BullModule } from "@nestjs/bullmq";
+import { CartProcessor } from "./processors/cart.processor";
+import { CartModule } from "../cart/cart.module";
+import { forwardRef } from "@nestjs/common";
 
 @Module({
-  imports: [DraftsModule, EventsModule, MongooseModule.forFeature([{ name: Order.name, schema: OrderSchema }])],
+  imports: [
+    DraftsModule,
+    EventsModule,
+    forwardRef(() => CartModule),
+    MongooseModule.forFeature([{ name: Order.name, schema: OrderSchema }]),
+    BullModule.registerQueue({
+      name: "cart",
+    }),
+  ],
   controllers: [OrdersController],
-  providers: [OrdersService],
+  providers: [OrdersService, CartProcessor],
+  exports: [OrdersService],
 })
 export class OrdersModule {}

@@ -1,4 +1,6 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsEmail, IsObject, IsString } from "class-validator";
+import { IsNotEmpty, IsNumber, IsOptional, IsEmail, IsObject, IsString, ValidateNested } from "class-validator";
+import { Type } from "class-transformer";
+import { CoreEntityDto } from "../../cart/dto/core-entity.dto";
 
 export class CreateDraftDto {
   @IsOptional()
@@ -9,14 +11,28 @@ export class CreateDraftDto {
   @IsEmail()
   userEmail?: string;
 
-  @IsObject()
   @IsNotEmpty()
-  configuration: {
-    wizardTempMaterial: any;
-    mainPieces: any[];
-  };
+  @ValidateNested()
+  @Type(() => CoreEntityDto)
+  core: CoreEntityDto;
+
+  @IsObject()
+  @IsOptional()
+  uiState?: Record<string, any>;
 
   @IsNumber()
-  @IsNotEmpty()
-  currentPricePoints: number;
+  @IsOptional()
+  currentPricePoints?: number;
+
+  @IsOptional()
+  @IsNumber()
+  originalPoints?: number;
+
+  @IsOptional()
+  @IsNumber()
+  discountAmount?: number;
+
+  @IsOptional()
+  @IsString()
+  cartGroupId?: string;
 }

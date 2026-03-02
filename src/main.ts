@@ -2,11 +2,19 @@
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
-import { Logger } from "@nestjs/common";
+import { Logger, ValidationPipe } from "@nestjs/common";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const logger = new Logger("Bootstrap"); // 2. Crea una instancia del Logger
+
+  // Habilitar validación global
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true, // Elimina propiedades que no estén en el DTO
+      transform: true, // Transforma los payloads a las clases DTO
+    }),
+  );
 
   // 1. Configuración de CORS (Usando la lógica que discutimos antes)
   const whitelist = process.env.CORS_ORIGIN;
