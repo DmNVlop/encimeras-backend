@@ -5,6 +5,7 @@
 /public
 res
 RES
+package-lock.json
 
 # Environment variables
 .env
