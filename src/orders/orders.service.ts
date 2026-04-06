@@ -69,6 +69,7 @@ export class OrdersService {
     const newOrder = new this.orderModel({
       header: {
         orderNumber: orderNumber,
+        orderName: createOrderDto.orderName,
         userId: userId,
         customerId: createOrderDto.customerId || draft.core.customerId,
         status: "PENDING",
@@ -93,7 +94,14 @@ export class OrdersService {
     newOrder.header.totalDiscount = (draft as any).discountAmount || 0;
 
     // 5. Guardar Orden y "Quemar" el Borrador
-    const savedOrder = await newOrder.save();
+    try {
+      var savedOrder = await newOrder.save();
+    } catch (error: any) {
+      if (error.code === 11000) {
+        throw new BadRequestException(`Ya existe un presupuesto con el nombre "${createOrderDto.orderName}". Por favor, usa otro nombre.`);
+      }
+      throw error;
+    }
     await this.draftsService.markAsConverted(draft._id);
 
     // Convertir a Objeto Plano (Limpia toda la basura interna de Mongoose)
@@ -141,7 +149,7 @@ export class OrdersService {
     return updatedOrder;
   }
 
-  async createFromCart(userId: string): Promise<Order> {
+  async createFromCart(userId: string, orderName: string): Promise<Order> {
     // 1. Recuperar el Carrito ACTIVO
     const cartData = await this.cartService.getOrCreateCart(userId);
 
@@ -168,6 +176,7 @@ export class OrdersService {
     const newOrder = new this.orderModel({
       header: {
         orderNumber: orderNumber,
+        orderName: orderName,
         userId: userId,
         customerId: cartData.customerId ?? (cartData.items.length > 0 ? cartData.items[0].core?.customerId : undefined),
         status: "PENDING",
@@ -181,7 +190,14 @@ export class OrdersService {
     });
 
     // 5. Guardar Orden
-    const savedOrder = await newOrder.save();
+    try {
+      var savedOrder = await newOrder.save();
+    } catch (error: any) {
+      if (error.code === 11000) {
+        throw new BadRequestException(`Ya existe un presupuesto con el nombre "${orderName}". Por favor, usa otro nombre.`);
+      }
+      throw error;
+    }
 
     // 6. "Cerrar" el carrito (Marcar como convertido)
     // Usamos el modelo para actualizar status.

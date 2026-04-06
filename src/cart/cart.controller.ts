@@ -70,8 +70,8 @@ export class CartController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Iniciar el proceso de creación de orden desde el carrito (Asíncrono)" })
-  async checkout(@Req() req) {
-    return this.cartService.checkout(req.user.userId);
+  async checkout(@Req() req, @Body() body: { orderName: string }) {
+    return this.cartService.checkout(req.user.userId, body.orderName);
   }
 
   @Post("items/group/:groupId")

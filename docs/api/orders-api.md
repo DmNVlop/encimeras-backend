@@ -8,16 +8,18 @@ Una orden se divide en una cabecera comercial (`OrderHeader`) y múltiples líne
 
 ### 1.1 OrderHeader (Cabecera)
 
-| Campo                 | Tipo     | Descripción                                            |
-| :-------------------- | :------- | :----------------------------------------------------- |
-| `orderNumber`         | `string` | ID secuencial único (ej: ORD-2026-0001).               |
-| `userId`              | `string` | Identificador del creador/propietario (Vendedor).      |
-| `customerId`          | `string` | Identificador del cliente final (opcional).            |
-| `status`              | `enum`   | PENDING, MANUFACTURING, SHIPPED, INSTALLED, CANCELLED. |
-| `totalPoints`         | `number` | Puntos totales finales (después de descuentos).        |
-| `totalOriginalPoints` | `number` | Puntos totales originales (sin descuentos).            |
-| `totalDiscount`       | `number` | Descuento total aplicado al pedido.                    |
-| `orderDate`           | `Date`   | Fecha de creación.                                     |
+| Campo                 | Tipo     | Descripción                                               |
+| :-------------------- | :------- | :-------------------------------------------------------- |
+| `orderNumber`         | `string` | ID secuencial único (ej: ORD-2026-0001).                  |
+| `orderName`           | `string` | Nombre identificador del presupuesto (único por usuario). |
+| `userId`              | `string` | Identificador del creador/propietario (Vendedor).         |
+| `customerId`          | `string` | Identificador del cliente final (opcional).               |
+| `status`              | `enum`   | PENDING, MANUFACTURING, SHIPPED, INSTALLED, CANCELLED.    |
+| `totalPoints`         | `number` | Puntos totales finales (después de descuentos).           |
+| `totalOriginalPoints` | `number` | Puntos totales originales (sin descuentos).               |
+| `totalDiscount`       | `number` | Descuento total aplicado al pedido.                       |
+| `orderDate`           | `Date`   | Fecha de creación.                                        |
+| `deliveryDate`        | `Date`   | Fecha de entrega programada (opcional).                   |
 
 ### 1.2 OrderLineItem (Línea de Detalle)
 
@@ -34,7 +36,10 @@ Cada línea representa un presupuesto independiente (ej: una cocina o una isla).
 
 ---
 
-## 2. Endpoints de la API
+## 2. Restricciones y Reglas de Negocio
+
+- **Unicidad por usuario**: El par `(userId, orderName)` es único. Un usuario no puede tener dos presupuestos con el mismo nombre.
+- **Campos inmutables**: Una vez creada la orden, `header` y `items` no deben modificarse.
 
 ### 2.1 Listar Órdenes (Headers)
 
@@ -55,6 +60,7 @@ Retorna la orden completa con todos los snapshots técnicos. Los detalles de cad
 Inicia el proceso asíncrono. El `customerId` de la cabecera se heredará del primer ítem del carrito si existe.
 
 - **URL**: `POST /cart/checkout`
+- **Body**: `{ "orderName": "Nombre del presupuesto" }`
 - **Respuesta**: 202 Accepted con `jobId`.
 
 ### 2.4 Crear desde Borrador (Legacy)
@@ -62,7 +68,7 @@ Inicia el proceso asíncrono. El `customerId` de la cabecera se heredará del pr
 Crea una orden a partir de un único borrador ID. Se puede enviar un `customerId` opcional para la cabecera.
 
 - **URL**: `POST /orders`
-- **Body**: `{ "draftId": "...", "customerId": "..." }`
+- **Body**: `{ "orderName": "Nombre del presupuesto", "draftId": "...", "customerId": "..." }`
 
 ---
 

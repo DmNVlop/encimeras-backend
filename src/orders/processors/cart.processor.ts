@@ -21,7 +21,7 @@ export class CartProcessor extends WorkerHost {
 
     try {
       // Llamamos al servicio de órdenes para consolidar el carrito
-      const order = await this.ordersService.createFromCart(job.data.userId);
+      const order = await this.ordersService.createFromCart(job.data.userId, job.data.orderName);
 
       this.logger.log(`Orden ${order.header.orderNumber} creada con éxito desde la cola.`);
 
