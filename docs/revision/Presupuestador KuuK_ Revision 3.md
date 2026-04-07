@@ -8,7 +8,7 @@ Desglose técnico y la documentación detallada dividida en Épicas e Historias 
 
 El diseño actual es bueno, pero requiere ajustes estructurales y de lógica de negocio para adaptarse al flujo de ventas.
 
-**US 1.1: Modificación de la validez del presupuesto en el PDF**
+**US 1.1: Modificación de la validez del presupuesto en el PDF** **[OK]**
 
 * **Descripción:** Como comercial, necesito que el PDF refleje correctamente la validez del presupuesto para que los clientes tengan clara la fecha límite de la oferta.  
 * **Criterios de Aceptación:**  
@@ -20,7 +20,7 @@ El diseño actual es bueno, pero requiere ajustes estructurales y de lógica de 
 
   * Es imperativo añadir explícitamente "Validez 30 días" al final del párrafo del footer.
 
-**US 1.2: Reubicación y renombrado del importe total**
+**US 1.2: Reubicación y renombrado del importe total** **[OK]**
 
 * **Descripción:** Como comercial, necesito que el cliente vea el importe en puntos al principio del documento para evitar que pase desapercibido si no lee todas las hojas.
 

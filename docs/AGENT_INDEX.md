@@ -12,6 +12,7 @@ Detalle de todos los endpoints disponibles para el frontend.
 - [Carrito de Compras](./api/cart-api.md): Gestión de pedidos múltiples.
 - [Borradores](./api/drafts-api.md): Persistencia temporal.
 - [Órdenes](./api/orders-api.md): Ciclo de vida de pedidos firmes.
+- [Configuración de Documentos](./api/document-settings-api.md): Footer del PDF y validez del presupuesto.
 
 ### 2. 🎨 [UX/UI e Integración](./ux-ui/)
 
