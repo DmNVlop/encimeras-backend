@@ -9,7 +9,16 @@ export class GlobalSettingsService {
 
   async getDraftValidityDays(): Promise<number> {
     const config = await this.settingsModel.findOne({ key: "default_config" });
-    // Si no existe config, devolvemos 15 días por defecto (Fail-safe)
     return config ? config.draftValidityDays : 1;
+  }
+
+  async getMultiSalesPerCustomer(): Promise<boolean> {
+    const config = await this.settingsModel.findOne({ key: "default_config" });
+    return config ? config.multiSalesPerCustomer : true;
+  }
+
+  async updateMultiSalesPerCustomer(value: boolean): Promise<GlobalSettings> {
+    const config = await this.settingsModel.findOneAndUpdate({ key: "default_config" }, { multiSalesPerCustomer: value }, { new: true, upsert: true });
+    return config;
   }
 }

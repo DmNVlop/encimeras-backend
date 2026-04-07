@@ -17,29 +17,30 @@ export class CustomersController {
   constructor(private readonly customersService: CustomersService) {}
 
   @Post()
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.SALES)
   @ApiOperation({ summary: "Create a new customer" })
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
-  create(@Body() createCustomerDto: CreateCustomerDto, @GetUser("factoryId") factoryId: string) {
-    // Fallback if factoryId is not in token yet
+  create(@Body() createCustomerDto: CreateCustomerDto, @GetUser("factoryId") factoryId: string, @GetUser("userId") userId: string) {
     const fid = factoryId || "000000000000000000000000";
-    return this.customersService.create(createCustomerDto, fid);
+    return this.customersService.create(createCustomerDto, fid, userId);
   }
 
   @Get()
   @Roles(Role.ADMIN, Role.SALES)
-  @ApiOperation({ summary: "List all active customers" })
-  findAll(@GetUser("factoryId") factoryId: string) {
+  @ApiOperation({ summary: "List all active customers (filtered by role)" })
+  findAll(@GetUser("factoryId") factoryId: string, @GetUser("userId") userId: string, @GetUser("roles") roles: string[]) {
     const fid = factoryId || "000000000000000000000000";
-    return this.customersService.findAll(fid);
+    const isAdmin = roles.includes(Role.ADMIN);
+    return isAdmin ? this.customersService.findAll(fid) : this.customersService.findAllForSales(fid, userId);
   }
 
   @Get(":id")
   @Roles(Role.ADMIN, Role.SALES)
-  @ApiOperation({ summary: "Get customer details" })
-  findOne(@Param("id") id: string, @GetUser("factoryId") factoryId: string) {
+  @ApiOperation({ summary: "Get customer details (access controlled by role)" })
+  findOne(@Param("id") id: string, @GetUser("factoryId") factoryId: string, @GetUser("userId") userId: string, @GetUser("roles") roles: string[]) {
     const fid = factoryId || "000000000000000000000000";
-    return this.customersService.findOne(id, fid);
+    const isAdmin = roles.includes(Role.ADMIN);
+    return isAdmin ? this.customersService.findOne(id, fid) : this.customersService.findOneForSales(id, fid, userId);
   }
 
   @Patch(":id")

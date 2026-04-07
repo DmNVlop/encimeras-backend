@@ -28,6 +28,7 @@ Arquitectura interna para desarrolladores backend.
 
 - [Infraestructura de Colas (Redis)](./dev/infra-colas-redis.md): Procesamiento asíncrono.
 - [Especificación Técnica Carrito](./dev/especificacion-modulo-carrito.md): Detalles de implementación interna.
+- [Control de Acceso a Clientes por Rol](./dev/control-acceso-clientes-sales.md): Restricción de visibilidad SALES vs ADMIN.
 
 ### 4. 💼 [Negocio / Admin](./business/)
 

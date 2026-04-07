@@ -29,6 +29,7 @@ import { CustomersModule } from "./customers/customers.module";
 import { DiscountRulesModule } from "./discount-rules/discount-rules.module";
 import { CartModule } from "./cart/cart.module";
 import { DocumentSettingsModule } from "./document-settings/document-settings.module";
+import { GlobalSettingsModule } from "./settings/global-settings.module";
 
 import { AnalyticsModule } from "./analytics/analytics.module";
 
@@ -84,6 +85,7 @@ import { RedisCheckService } from "./redis-check.service";
     DiscountRulesModule,
     CartModule,
     DocumentSettingsModule,
+    GlobalSettingsModule,
   ],
   controllers: [AppController],
   providers: [AppService, RedisCheckService],

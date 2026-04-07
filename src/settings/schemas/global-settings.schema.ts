@@ -11,6 +11,9 @@ export class GlobalSettings extends Document {
 
   @Prop({ default: 1.0 })
   currentCurrencyMultiplier: number; // Para conversiones futuras Puntos -> Moneda
+
+  @Prop({ default: true })
+  multiSalesPerCustomer: boolean; // true = varios SALES por cliente, false = uno solo
 }
 
 export const GlobalSettingsSchema = SchemaFactory.createForClass(GlobalSettings);

@@ -80,7 +80,7 @@ Debemos eliminar la fricción conceptual y técnica en la gestión de proyectos 
 
 Se requieren mejoras en la lógica de configuración de piezas complejas.
 
-**US 3.1: Selección de grupo de material por pieza individual (Paso 2\)**
+**US 3.1: Selección de grupo de material por pieza individual (Paso 2\)** **[OK]**
 
 * **Descripción:** Como usuario, necesito poder asignar diferentes grupos de materiales a distintas piezas de una misma encimera con forma.
 
@@ -91,7 +91,7 @@ Se requieren mejoras en la lógica de configuración de piezas complejas.
 
   * *Nota de Arquitectura:* La solución más sencilla de cara al usuario es integrarlo directamente en ese apartado; si esto genera deuda técnica o complicaciones en el modelo de datos, se requerirá una reunión técnica para evaluar alternativas.
 
-**US 3.2: Implementación de "Forma Libre" (Paso 2\)**
+**US 3.2: Implementación de "Forma Libre" (Paso 2\)** **[OK]**
 
 * **Descripción:** Como usuario, necesito una opción de "forma libre" para configurar pedidos poco comunes que no se ajustan a las plantillas predefinidas.
 
@@ -104,7 +104,7 @@ Se requieren mejoras en la lógica de configuración de piezas complejas.
 
   * Debe permitir configurar, por ejemplo, una encimera en U de gran tamaño utilizando 4 tableros en lugar de los 3 habituales.
 
-**US 3.3: Botón de continuidad en el modal de resumen (Paso 5\)**
+**US 3.3: Botón de continuidad en el modal de resumen (Paso 5\)** **[OK]**
 
 * **Descripción:** Como usuario, necesito una forma rápida de seguir añadiendo elementos al mismo proyecto sin tener que navegar por menús adicionales.
 

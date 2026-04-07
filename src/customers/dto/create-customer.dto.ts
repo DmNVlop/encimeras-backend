@@ -116,4 +116,9 @@ export class CreateCustomerDto {
   @ValidateNested()
   @Type(() => AddressDto)
   address?: AddressDto;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  allowedSalesUserIds?: string[];
 }
