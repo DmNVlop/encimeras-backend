@@ -1,15 +1,19 @@
-import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { Model } from "mongoose";
 import { Customer, CustomerDocument } from "./schemas/customer.schema";
+import { User } from "../users/schemas/users.schema";
 import { CreateCustomerDto } from "./dto/create-customer.dto";
 import { UpdateCustomerDto } from "./dto/update-customer.dto";
+import { BatchAssignSalesDto } from "./dto/batch-assign-sales.dto";
 import { GlobalSettingsService } from "../settings/global-settings.service";
+import { Role } from "../auth/enums/role.enum";
 
 @Injectable()
 export class CustomersService {
   constructor(
     @InjectModel(Customer.name) private customerModel: Model<CustomerDocument>,
+    @InjectModel(User.name) private userModel: Model<User>,
     private settingsService: GlobalSettingsService,
   ) {}
 
@@ -115,5 +119,40 @@ export class CustomersService {
       throw new NotFoundException(`Customer with ID "${id}" not found`);
     }
     return customer;
+  }
+
+  async batchAssignSales(dto: BatchAssignSalesDto, factoryId: string): Promise<{ updatedCount: number }> {
+    const salesUsers = await this.userModel.find({ _id: { $in: dto.salesUserIds }, roles: Role.SALES }).exec();
+
+    if (salesUsers.length !== dto.salesUserIds.length) {
+      const foundIds = salesUsers.map((u) => (u._id as unknown as string).toString());
+      const missing = dto.salesUserIds.filter((id) => !foundIds.includes(id));
+      throw new NotFoundException(`Sales users not found or do not have SALES role: ${missing.join(", ")}`);
+    }
+
+    const multiSales = await this.settingsService.getMultiSalesPerCustomer();
+    if (!multiSales && dto.salesUserIds.length > 1) {
+      throw new ForbiddenException("Multi-sales per customer is disabled. Only one sales user can be assigned.");
+    }
+
+    const result = await this.customerModel
+      .updateMany({ _id: { $in: dto.customerIds }, factoryId, isActive: true }, { $set: { allowedSalesUserIds: dto.salesUserIds } })
+      .exec();
+
+    if (result.matchedCount === 0) {
+      throw new NotFoundException("No active customers found with the given IDs and factory");
+    }
+
+    return { updatedCount: result.matchedCount };
+  }
+
+  async batchRemove(customerIds: string[], factoryId: string): Promise<{ deletedCount: number }> {
+    const result = await this.customerModel.updateMany({ _id: { $in: customerIds }, factoryId, isActive: true }, { $set: { isActive: false } }).exec();
+
+    if (result.matchedCount === 0) {
+      throw new NotFoundException("No active customers found with the given IDs and factory");
+    }
+
+    return { deletedCount: result.matchedCount };
   }
 }

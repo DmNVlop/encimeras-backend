@@ -47,16 +47,83 @@ _\*Nota: Si no se envía `officialName` para un `INDIVIDUAL`, el backend lo gene
 
 ## 2. API Endpoints: Clientes (`/customers`)
 
-| Método   | Endpoint                      | Roles             | Descripción                              |
-| :------- | :---------------------------- | :---------------- | :--------------------------------------- |
-| `GET`    | `/customers`                  | `ADMIN`, `SALES`  | Lista de clientes activos.               |
-| `GET`    | `/customers/:id`              | `ADMIN`, `SALES`  | Detalle de un cliente.                   |
-| `POST`   | `/customers`                  | `ADMIN`           | Crear nuevo cliente.                     |
-| `PATCH`  | `/customers/:id`              | `ADMIN`, `USER`\* | Actualizar información.                  |
-| `DELETE` | `/customers/:id`              | `ADMIN`           | Desactivar cliente (Soft Delete).        |
-| `POST`   | `/customers/:id/link/:userId` | `ADMIN`           | Vincular cliente a un usuario de acceso. |
+| Método   | Endpoint                        | Roles             | Descripción                              |
+| :------- | :------------------------------ | :---------------- | :--------------------------------------- |
+| `GET`    | `/customers`                    | `ADMIN`, `SALES`  | Lista de clientes activos.               |
+| `GET`    | `/customers/:id`                | `ADMIN`, `SALES`  | Detalle de un cliente.                   |
+| `POST`   | `/customers`                    | `ADMIN`           | Crear nuevo cliente.                     |
+| `PATCH`  | `/customers/:id`                | `ADMIN`, `USER`\* | Actualizar información.                  |
+| `DELETE` | `/customers/:id`                | `ADMIN`           | Desactivar cliente (Soft Delete).        |
+| `POST`   | `/customers/:id/link/:userId`   | `ADMIN`           | Vincular cliente a un usuario de acceso. |
+| `PATCH`  | `/customers/batch/assign-sales` | `ADMIN`           | Asignar vendedores a múltiples clientes. |
+| `DELETE` | `/customers/batch`              | `ADMIN`           | Desactivar múltiples clientes.           |
 
 _\*Restricción: Roles `USER` solo pueden editar su perfil si `platformUserId` coincide con su ID de sesión._
+
+### Endpoints Batch
+
+#### `PATCH /customers/batch/assign-sales`
+
+Asigna uno o más vendedores (usuarios con rol `SALES`) a múltiples clientes simultáneamente.
+
+**Body:**
+
+```json
+{
+  "customerIds": ["cust1", "cust2", "cust3"],
+  "salesUserIds": ["sales1", "sales2"]
+}
+```
+
+**Validaciones:**
+
+- Todos los `salesUserIds` deben existir y tener rol `SALES`
+- Si `multiSalesPerCustomer` está deshabilitado en configuración global, solo se permite 1 sales por cliente
+- Solo se asigna a clientes activos (`isActive: true`) del `factoryId` del admin
+
+**Response 200:**
+
+```json
+{
+  "updatedCount": 3
+}
+```
+
+**Errores:**
+
+| Código | Descripción                                  |
+| :----- | :------------------------------------------- |
+| `404`  | Sales users no encontrados o sin rol `SALES` |
+| `403`  | Multi-sales deshabilitado y se enviaron >1   |
+| `404`  | No se encontraron clientes activos           |
+
+---
+
+#### `DELETE /customers/batch`
+
+Desactiva (soft delete) múltiples clientes simultáneamente.
+
+**Body:**
+
+```json
+{
+  "customerIds": ["cust1", "cust2"]
+}
+```
+
+**Response 200:**
+
+```json
+{
+  "deletedCount": 2
+}
+```
+
+**Errores:**
+
+| Código | Descripción                        |
+| :----- | :--------------------------------- |
+| `404`  | No se encontraron clientes activos |
 
 ---
 

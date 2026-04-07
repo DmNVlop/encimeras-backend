@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, ForbiddenException } from "@nestjs/common";
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, ForbiddenException, Query } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
 import { UsersService } from "./users.service";
 import { CreateUserDto } from "./dto/create-user.dto";
@@ -26,10 +26,10 @@ export class UsersController {
 
   @Roles(Role.ADMIN)
   @Get()
-  @ApiOperation({ summary: "Obtener lista de todos los usuarios (Solo Admin)" })
+  @ApiOperation({ summary: "Obtener lista de usuarios (Solo Admin). Opcional: ?role=SALES para filtrar" })
   @ApiResponse({ status: 200, description: "Lista de usuarios obtenida." })
-  findAll() {
-    return this.usersService.findAll();
+  findAll(@Query("role") role?: string) {
+    return this.usersService.findAll(role);
   }
 
   @Roles(Role.ADMIN, Role.USER, Role.SALES, Role.WORKER)

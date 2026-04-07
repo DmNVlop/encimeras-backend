@@ -13,6 +13,8 @@ Detalle de todos los endpoints disponibles para el frontend.
 - [Borradores](./api/drafts-api.md): Persistencia temporal.
 - [Órdenes](./api/orders-api.md): Ciclo de vida de pedidos firmes.
 - [Configuración de Documentos](./api/document-settings-api.md): Footer del PDF y validez del presupuesto.
+- [Usuarios](./api/users-api.md): Gestión de usuarios y roles.
+- [Clientes](./api/customers-api.md): Clientes B2B/B2C y operaciones batch.
 
 ### 2. 🎨 [UX/UI e Integración](./ux-ui/)
 

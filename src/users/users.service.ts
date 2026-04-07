@@ -31,8 +31,9 @@ export class UsersService {
     return newUser.save();
   }
 
-  async findAll(): Promise<User[]> {
-    return this.userModel.find().select("-password").exec();
+  async findAll(role?: string): Promise<User[]> {
+    const query = role ? { roles: role } : {};
+    return this.userModel.find(query).select("-password").exec();
   }
 
   async findOne(id: string): Promise<User> {

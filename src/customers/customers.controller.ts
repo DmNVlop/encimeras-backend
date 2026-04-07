@@ -3,6 +3,8 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { CustomersService } from "./customers.service";
 import { CreateCustomerDto } from "./dto/create-customer.dto";
 import { UpdateCustomerDto } from "./dto/update-customer.dto";
+import { BatchAssignSalesDto } from "./dto/batch-assign-sales.dto";
+import { BatchDeleteCustomersDto } from "./dto/batch-delete-customers.dto";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -66,5 +68,23 @@ export class CustomersController {
   linkToUser(@Param("id") id: string, @Param("userId") userId: string, @GetUser("factoryId") factoryId: string) {
     const fid = factoryId || "000000000000000000000000";
     return this.customersService.linkToUser(id, userId, fid);
+  }
+
+  @Patch("batch/assign-sales")
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: "Assign sales users to multiple customers in batch" })
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  batchAssignSales(@Body() dto: BatchAssignSalesDto, @GetUser("factoryId") factoryId: string) {
+    const fid = factoryId || "000000000000000000000000";
+    return this.customersService.batchAssignSales(dto, fid);
+  }
+
+  @Delete("batch")
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: "Deactivate multiple customers in batch (Soft Delete)" })
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  batchRemove(@Body() dto: BatchDeleteCustomersDto, @GetUser("factoryId") factoryId: string) {
+    const fid = factoryId || "000000000000000000000000";
+    return this.customersService.batchRemove(dto.customerIds, fid);
   }
 }
