@@ -44,17 +44,17 @@ El diseño actual es bueno, pero requiere ajustes estructurales y de lógica de 
 
 ### ---
 
-**ÉPICA 2: Optimización del Flujo del Carrito**
+**ÉPICA 2: Optimización del Flujo del Carrito** **[OK]**
 
 Debemos eliminar la fricción conceptual y técnica en la gestión de proyectos dentro del carrito.
 
-**US 2.1: Actualización de la nomenclatura del módulo**
+**US 2.1: Actualización de la nomenclatura del módulo** **[OK]**
 
 * **Descripción:** Como usuario, necesito que la interfaz utilice la terminología correcta para evitar confusión sobre el estado del proyecto.  
 * **Criterios de Aceptación:**  
   * Se debe reemplazar la palabra “pedido” (o "pedido/s") por “presupuesto” (o "presupuesto/s") en todos los textos de esta sección.
 
-**US 2.2: Nomenclatura personalizada de presupuestos**
+**US 2.2: Nomenclatura personalizada de presupuestos** **[OK]**
 
 * **Descripción:** Como usuario, necesito poder nombrar mis presupuestos para identificarlos rápidamente en la carpeta "mis presupuestos".
 
@@ -63,7 +63,7 @@ Debemos eliminar la fricción conceptual y técnica en la gestión de proyectos 
 
   * Alternativamente, se debe proporcionar un campo para introducir el nombre manualmente al iniciar el proyecto en el carrito.
 
-**US 2.3: Corrección del flujo de finalización del carrito**
+**US 2.3: Corrección del flujo de finalización del carrito** **[OK]**
 
 * **Descripción:** Como usuario, necesito que al finalizar un presupuesto, el sistema me redirija correctamente y limpie el carrito para poder iniciar uno nuevo sin mezclar proyectos.
 

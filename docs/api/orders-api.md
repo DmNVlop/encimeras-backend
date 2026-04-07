@@ -39,6 +39,7 @@ Cada línea representa un presupuesto independiente (ej: una cocina o una isla).
 ## 2. Restricciones y Reglas de Negocio
 
 - **Unicidad por usuario**: El par `(userId, orderName)` es único. Un usuario no puede tener dos presupuestos con el mismo nombre.
+- **Auto-numeración**: Si el nombre ya existe, el sistema automáticamente agrega un sufijo numérico entre paréntesis. Por ejemplo, si "Presupuesto" ya existe, se guardará como "Presupuesto (1)", "Presupuesto (2)", etc.
 - **Campos inmutables**: Una vez creada la orden, `header` y `items` no deben modificarse.
 
 ### 2.1 Listar Órdenes (Headers)
