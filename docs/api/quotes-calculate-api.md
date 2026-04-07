@@ -192,3 +192,17 @@ Es importante que el equipo de Frontend entienda el orden de operaciones para mo
   ]
 }
 ```
+
+---
+
+## 8. Endpoints Relacionados
+
+Para agregar, modificar o eliminar piezas en un presupuesto ya guardado, consultar:
+
+- [Gestión de Piezas en Presupuestos](./quotes-pieces-api.md)
+
+Endpoints disponibles:
+
+- `POST /quotes/:id/pieces` — Agregar pieza
+- `PATCH /quotes/:id/pieces/:pieceId` — Modificar pieza
+- `DELETE /quotes/:id/pieces/:pieceId` — Eliminar pieza

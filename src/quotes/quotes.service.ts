@@ -4,8 +4,10 @@ import { InjectModel } from "@nestjs/mongoose";
 import { HydratedDocument, Model, Types } from "mongoose";
 
 import { Quote, QuoteDocument } from "./schemas/quote.schema";
-import { CalculateQuoteDto } from "./dto/quote.dto";
+import { CalculateQuoteDto, MainPieceDto } from "./dto/quote.dto";
 import { CreateQuoteDto } from "./dto/create-quote.dto";
+import { AddPieceDto } from "./dto/add-piece.dto";
+import { UpdatePieceInQuoteDto } from "./dto/update-piece-in-quote.dto";
 import { MaterialsService } from "src/materials/materials.service";
 import { PriceConfigsService } from "src/price-configs/price-configs.service";
 import { AddonsService } from "src/addons/addons.service";
@@ -197,6 +199,101 @@ export class QuotesService {
   }
   update(id: string, status: { status: string }) {
     return this.quoteModel.findByIdAndUpdate(id, status, { new: true });
+  }
+
+  async addPiece(quoteId: string, addPieceDto: AddPieceDto): Promise<Quote> {
+    const quote = await this.quoteModel.findById(quoteId);
+    if (!quote) {
+      throw new NotFoundException(`Quote with ID "${quoteId}" not found`);
+    }
+
+    const createdPiece = (await this.mainPiecesService.create(addPieceDto)) as HydratedDocument<MainPiece>;
+
+    (quote.mainPieces as unknown as Types.ObjectId[]).push(createdPiece._id);
+
+    return this.recalculateAndSave(quote);
+  }
+
+  async updatePiece(quoteId: string, pieceId: string, updatePieceDto: UpdatePieceInQuoteDto): Promise<Quote> {
+    const quote = await this.quoteModel.findById(quoteId);
+    if (!quote) {
+      throw new NotFoundException(`Quote with ID "${quoteId}" not found`);
+    }
+
+    const pieceIdObj = new Types.ObjectId(pieceId);
+    const pieceRefs = quote.mainPieces as unknown as Types.ObjectId[];
+    const pieceRef = pieceRefs.find((id: Types.ObjectId) => id.equals(pieceIdObj));
+    if (!pieceRef) {
+      throw new NotFoundException(`Piece with ID "${pieceId}" not found in quote "${quoteId}"`);
+    }
+
+    await this.mainPiecesService.update(pieceId, updatePieceDto);
+
+    return this.recalculateAndSave(quote);
+  }
+
+  async removePiece(quoteId: string, pieceId: string): Promise<Quote> {
+    const quote = await this.quoteModel.findById(quoteId);
+    if (!quote) {
+      throw new NotFoundException(`Quote with ID "${quoteId}" not found`);
+    }
+
+    const pieceIdObj = new Types.ObjectId(pieceId);
+    const pieceRefs = quote.mainPieces as unknown as Types.ObjectId[];
+    const pieceIndex = pieceRefs.findIndex((id: Types.ObjectId) => id.equals(pieceIdObj));
+    if (pieceIndex === -1) {
+      throw new NotFoundException(`Piece with ID "${pieceId}" not found in quote "${quoteId}"`);
+    }
+
+    pieceRefs.splice(pieceIndex, 1);
+
+    await this.mainPiecesService.remove(pieceId);
+
+    return this.recalculateAndSave(quote);
+  }
+
+  private async recalculateAndSave(quote: QuoteDocument): Promise<Quote> {
+    const populatedQuote = await this.quoteModel
+      .findById(quote._id)
+      .populate({ path: "mainPieces", populate: { path: "materialId" } })
+      .exec();
+
+    if (!populatedQuote) {
+      throw new NotFoundException(`Quote not found`);
+    }
+
+    const calculateDto: CalculateQuoteDto = {
+      mainPieces: populatedQuote.mainPieces.map((piece: HydratedDocument<MainPiece>) => ({
+        materialId: (piece.materialId as any)._id.toString(),
+        selectedAttributes: piece.selectedAttributes,
+        length_mm: piece.length_mm,
+        width_mm: piece.width_mm,
+        appliedAddons: piece.appliedAddons?.map((addon) => ({
+          code: addon.code,
+          measurements: addon.measurements,
+          quantity: addon.quantity,
+        })),
+      })),
+      factoryId: undefined,
+      customerId: undefined,
+    };
+
+    const calculation = await this.calculate(calculateDto);
+
+    const flatBreakdown = calculation.pieces.map((p: any) => ({
+      description: p.pieceName,
+      points: p.subtotalPoints,
+      discountAmount: p.discountAmount,
+      finalPoints: p.finalPricePoints,
+    }));
+
+    populatedQuote.totalPrice = calculation.finalTotalPoints;
+    populatedQuote.totalPriceBeforeDiscount = calculation.totalPoints;
+    populatedQuote.totalDiscount = calculation.totalDiscount;
+    populatedQuote.appliedRules = calculation.appliedRules;
+    populatedQuote.priceBreakdown = flatBreakdown;
+
+    return populatedQuote.save();
   }
 
   // ===========================================================================
