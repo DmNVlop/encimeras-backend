@@ -120,5 +120,5 @@ export class CreateCustomerDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  allowedSalesUserIds?: string[];
+  assignedUserIds?: string[];
 }

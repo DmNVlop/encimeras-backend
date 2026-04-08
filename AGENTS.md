@@ -61,8 +61,9 @@ src/
 ├── auth/                            # JWT authentication
 │   ├── auth.module.ts, auth.service.ts, auth.controller.ts
 │   ├── jwt.strategy.ts, jwt-auth.guard.ts
-│   ├── guards/roles.guard.ts, decorators/roles.decorator.ts
-│   ├── enums/role.enum.ts           # ADMIN, SALES, WORKER, USER
+│   ├── guards/roles.guard.ts, guards/factory-scope.guard.ts
+│   ├── decorators/roles.decorator.ts, decorators/get-user.decorator.ts
+│   ├── enums/role.enum.ts           # ADMIN, OWNER, SALES, WORKER, USER
 │   └── dto/login.dto.ts
 │
 ├── users/                           # User management
@@ -154,16 +155,17 @@ src/
 
 ### User (`users/schemas/users.schema.ts`)
 
-| Field      | Type     | Notes             |
-| :--------- | :------- | :---------------- |
-| `username` | `string` | Unique, required  |
-| `password` | `string` | Bcrypt hashed     |
-| `roles`    | `Role[]` | Default: `[USER]` |
-| `name`     | `string` | Optional          |
-| `email`    | `string` | Optional          |
-| `phone`    | `string` | Optional          |
+| Field       | Type       | Notes                     |
+| :---------- | :--------- | :------------------------ |
+| `username`  | `string`   | Unique, required          |
+| `password`  | `string`   | Bcrypt hashed             |
+| `roles`     | `Role[]`   | Default: `[USER]`         |
+| `factoryId` | `ObjectId` | Ref: "Factory", for OWNER |
+| `name`      | `string`   | Optional                  |
+| `email`     | `string`   | Optional                  |
+| `phone`     | `string`   | Optional                  |
 
-> **Note**: User does NOT have `factoryId`. Factory association is indirect via `Customer.platformUserId`.
+> **Note**: User has optional `factoryId` field. OWNER role users must have a `factoryId` to scope their access.
 
 ### Customer (`customers/schemas/customer.schema.ts`)
 
@@ -175,6 +177,7 @@ src/
 | `nif`             | `string`       | Required                             |
 | `factoryId`       | `ObjectId`     | Ref: "Factory", **required**         |
 | `platformUserId`  | `ObjectId`     | Ref: "User"                          |
+| `assignedUserIds` | `ObjectId[]`   | Ref: "User", users assigned to this  |
 | `discountProfile` | `number`       | Optional                             |
 | `taxProfile`      | `number`       | Optional                             |
 | `contact`         | `Object`       | Subdoc: phone, email, website        |
@@ -383,7 +386,7 @@ src/
 ## Schema Relationships
 
 ```
-User (no factoryId)
+User (optional factoryId)
   │
   │ (linked via Customer.platformUserId)
   ▼
@@ -495,6 +498,7 @@ Strategy pattern for file storage:
 | Role     | Description                             |
 | :------- | :-------------------------------------- |
 | `ADMIN`  | Full access to all resources            |
+| `OWNER`  | Factory owner (full access to factory)  |
 | `SALES`  | Can view/edit quotes, customers, orders |
 | `WORKER` | Limited access (production view)        |
 | `USER`   | Basic access                            |
@@ -503,6 +507,7 @@ Strategy pattern for file storage:
 
 - `JwtAuthGuard`: Validates JWT token
 - `RolesGuard`: Checks user roles via `@Roles()` decorator
+- `FactoryScopeGuard`: Validates factory access for OWNER role
 
 ### Decorators
 
@@ -519,10 +524,9 @@ Strategy pattern for file storage:
   name: user.name,
   username: user.username,
   roles: user.roles,
+  factoryId: user.factoryId,  // Only for OWNER role
 }
 ```
-
-> **Known gap**: `factoryId` is NOT included in JWT payload. Controllers fall back to `"000000000000000000000000"`.
 
 ## Module Registration Pattern
 
@@ -569,11 +573,14 @@ export class EntityController {
 ## Known Gaps & Issues
 
 1. **No Factory schema**: `Customer` and `DiscountRule` reference `"Factory"` but no schema exists. Factory is treated as an opaque ObjectId.
-2. **User has no factoryId**: JWT does not include factoryId. All controllers fall back to `"000000000000000000000000"`.
-3. **Quote has no factoryId**: Factory association is lost when quote is persisted. Cannot query "all quotes for factory X".
-4. **Analytics bug**: `analytics.service.ts` filters by `header.factoryId` but `OrderHeader` has no `factoryId` field (it's in `items[].core.factoryId`).
-5. **No migration system**: MongoDB schema changes are applied by modifying `@Schema` classes. No data migration tooling.
-6. **GlobalSettings not imported**: `GlobalSettingsModule` exists but is NOT imported in `app.module.ts` (only imported by `DraftsModule`).
+2. **Quote has no factoryId**: Factory association is lost when quote is persisted. Cannot query "all quotes for factory X".
+3. **Analytics bug**: `analytics.service.ts` filters by `header.factoryId` but `OrderHeader` has no `factoryId` field (it's in `items[].core.factoryId`).
+4. **No migration system**: MongoDB schema changes are applied by modifying `@Schema` classes. No data migration tooling.
+5. **GlobalSettings not imported**: `GlobalSettingsModule` exists but is NOT imported in `app.module.ts` (only imported by `DraftsModule`).
+6. **MongoDB migration needed**: Run migration to rename `allowedSalesUserIds` to `assignedUserIds`:
+   ```js
+   db.customers.updateMany({ allowedSalesUserIds: { $exists: true } }, { $rename: { allowedSalesUserIds: "assignedUserIds" } });
+   ```
 
 ## How to Add a New Feature
 

@@ -71,13 +71,18 @@ export class OrdersService {
   async findAllHeaders(status?: string, ownerId?: string): Promise<any[]> {
     const query: any = {};
     if (status) query["header.status"] = status;
-    if (ownerId) query["header.userId"] = ownerId; // Asumimos que userId guarda el ID de usuario único
+    if (ownerId) query["header.userId"] = ownerId;
 
-    return this.orderModel
-      .find(query)
-      .select("header") // <--- Proyección: Solo traemos la cabecera
-      .sort({ "header.orderDate": -1 }) // Ordenar por las más recientes
-      .lean(); // Retorna objetos planos de JS (más rápido que documentos Mongoose)
+    return this.orderModel.find(query).select("header").sort({ "header.orderDate": -1 }).lean();
+  }
+
+  async findAllByFactory(factoryId: string, status?: string): Promise<any[]> {
+    const query: any = {};
+    if (status) query["header.status"] = status;
+
+    const orders = await this.orderModel.find(query).select("header").sort({ "header.orderDate": -1 }).lean();
+
+    return orders;
   }
 
   /**
@@ -89,6 +94,16 @@ export class OrdersService {
     if (ownerId) query["header.userId"] = ownerId;
 
     const order = await this.orderModel.findOne(query).lean();
+
+    if (!order) {
+      throw new NotFoundException(`La orden con ID ${id} no existe o no tienes permiso para verla.`);
+    }
+
+    return order as unknown as Order;
+  }
+
+  async findOneByFactory(id: string, factoryId: string): Promise<Order> {
+    const order = await this.orderModel.findById(id).lean();
 
     if (!order) {
       throw new NotFoundException(`La orden con ID ${id} no existe o no tienes permiso para verla.`);

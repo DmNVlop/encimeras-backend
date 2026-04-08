@@ -11,6 +11,7 @@ import { QuotesService } from "./quotes.service";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { Role } from "../auth/enums/role.enum";
+import { GetUser } from "../auth/decorators/get-user.decorator";
 
 @ApiTags("Quotes")
 @Controller("quotes")
@@ -64,19 +65,27 @@ export class QuotesController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  @Roles(Role.ADMIN, Role.SALES)
+  @Roles(Role.ADMIN, Role.OWNER, Role.SALES)
   @Get()
-  @ApiOperation({ summary: "Get all quotes (Admin & Sales)" })
-  findAll() {
+  @ApiOperation({ summary: "Get all quotes (Admin, Owner & Sales)" })
+  findAll(@GetUser() user: any) {
+    const factoryId = user?.factoryId;
+    if (user?.roles.includes(Role.OWNER) && factoryId) {
+      return this.quotesService.findAllByFactory(factoryId);
+    }
     return this.quotesService.findAll();
   }
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  @Roles(Role.ADMIN, Role.SALES)
+  @Roles(Role.ADMIN, Role.OWNER, Role.SALES)
   @Get(":id")
-  @ApiOperation({ summary: "Get a single quote by ID (Admin & Sales)" })
-  findOne(@Param("id") id: string) {
+  @ApiOperation({ summary: "Get a single quote by ID (Admin, Owner & Sales)" })
+  findOne(@Param("id") id: string, @GetUser() user: any) {
+    const factoryId = user?.factoryId;
+    if (user?.roles.includes(Role.OWNER) && factoryId) {
+      return this.quotesService.findOneByFactory(id, factoryId);
+    }
     return this.quotesService.findOne(id);
   }
 

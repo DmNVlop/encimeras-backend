@@ -188,12 +188,30 @@ export class QuotesService {
       .populate({ path: "mainPieces", populate: { path: "materialId" } })
       .exec();
   }
+
+  async findAllByFactory(factoryId: string): Promise<Quote[]> {
+    const quotes = await this.quoteModel
+      .find()
+      .populate({ path: "mainPieces", populate: { path: "materialId" } })
+      .exec();
+    return quotes;
+  }
+
   findOne(id: string) {
     return this.quoteModel
       .findById(id)
       .populate({ path: "mainPieces", populate: { path: "materialId" } })
       .exec();
   }
+
+  async findOneByFactory(id: string, factoryId: string): Promise<Quote> {
+    const quote = await this.findOne(id);
+    if (!quote) {
+      throw new NotFoundException(`Quote with ID "${id}" not found`);
+    }
+    return quote;
+  }
+
   remove(id: string) {
     return this.quoteModel.findByIdAndDelete(id);
   }

@@ -97,7 +97,7 @@ export class Customer {
   address: Address;
 
   @Prop({ type: [MongooseSchema.Types.ObjectId], ref: "User", default: [] })
-  allowedSalesUserIds: string[];
+  assignedUserIds: string[];
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: "User" })
   createdBy: string;

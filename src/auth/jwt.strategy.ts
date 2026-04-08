@@ -24,12 +24,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
-    // Esto es lo que se inyecta en request.user
     return {
-      userId: payload.sub, // 'sub' es el estándar para el ID del sujeto
+      userId: payload.sub,
       name: payload.name,
       username: payload.username,
       roles: payload.roles,
+      factoryId: payload.factoryId || null,
     };
   }
 }

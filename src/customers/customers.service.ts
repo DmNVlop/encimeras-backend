@@ -5,7 +5,7 @@ import { Customer, CustomerDocument } from "./schemas/customer.schema";
 import { User } from "../users/schemas/users.schema";
 import { CreateCustomerDto } from "./dto/create-customer.dto";
 import { UpdateCustomerDto } from "./dto/update-customer.dto";
-import { BatchAssignSalesDto } from "./dto/batch-assign-sales.dto";
+import { BatchAssignUsersDto } from "./dto/batch-assign-sales.dto";
 import { GlobalSettingsService } from "../settings/global-settings.service";
 import { Role } from "../auth/enums/role.enum";
 
@@ -19,7 +19,7 @@ export class CustomersService {
 
   async create(createCustomerDto: CreateCustomerDto, factoryId: string, userId: string): Promise<Customer> {
     const multiSales = await this.settingsService.getMultiSalesPerCustomer();
-    if (!multiSales && createCustomerDto.allowedSalesUserIds && createCustomerDto.allowedSalesUserIds.length > 1) {
+    if (!multiSales && createCustomerDto.assignedUserIds && createCustomerDto.assignedUserIds.length > 1) {
       throw new ForbiddenException("Multi-sales per customer is disabled. Only one sales user can be assigned.");
     }
 
@@ -35,12 +35,16 @@ export class CustomersService {
     return this.customerModel.find({ factoryId, isActive: true }).exec();
   }
 
+  async findAllForOwner(factoryId: string): Promise<Customer[]> {
+    return this.customerModel.find({ factoryId, isActive: true }).exec();
+  }
+
   async findAllForSales(factoryId: string, userId: string): Promise<Customer[]> {
     return this.customerModel
       .find({
         factoryId,
         isActive: true,
-        $or: [{ createdBy: userId }, { allowedSalesUserIds: userId }],
+        $or: [{ createdBy: userId }, { assignedUserIds: userId }],
       })
       .exec();
   }
@@ -53,12 +57,20 @@ export class CustomersService {
     return customer;
   }
 
+  async findOneForOwner(id: string, factoryId: string): Promise<Customer> {
+    const customer = await this.customerModel.findOne({ _id: id, factoryId, isActive: true }).exec();
+    if (!customer) {
+      throw new NotFoundException(`Customer with ID "${id}" not found`);
+    }
+    return customer;
+  }
+
   async findOneForSales(id: string, factoryId: string, userId: string): Promise<Customer> {
     const customer = await this.customerModel
       .findOne({
         _id: id,
         factoryId,
-        $or: [{ createdBy: userId }, { allowedSalesUserIds: userId }],
+        $or: [{ createdBy: userId }, { assignedUserIds: userId }],
       })
       .exec();
     if (!customer) {
@@ -79,18 +91,24 @@ export class CustomersService {
     }
 
     const isSales = currentUserRoles.includes("SALES") && !currentUserRoles.includes("ADMIN");
-    if (isSales && customer.createdBy !== currentUserId && !customer.allowedSalesUserIds?.includes(currentUserId)) {
+    const isOwner = currentUserRoles.includes("OWNER") && !currentUserRoles.includes("ADMIN");
+
+    if (isSales && customer.createdBy !== currentUserId && !customer.assignedUserIds?.includes(currentUserId)) {
+      throw new ForbiddenException("You can only update customers assigned to you");
+    }
+
+    if (isOwner && customer.createdBy !== currentUserId && !customer.assignedUserIds?.includes(currentUserId)) {
       throw new ForbiddenException("You can only update customers assigned to you");
     }
 
     const sanitizedDto = { ...updateCustomerDto };
     if (isSales) {
-      delete sanitizedDto.allowedSalesUserIds;
+      delete sanitizedDto.assignedUserIds;
     }
 
-    if (!isSales && sanitizedDto.allowedSalesUserIds) {
+    if (!isSales && sanitizedDto.assignedUserIds) {
       const multiSales = await this.settingsService.getMultiSalesPerCustomer();
-      if (!multiSales && sanitizedDto.allowedSalesUserIds.length > 1) {
+      if (!multiSales && sanitizedDto.assignedUserIds.length > 1) {
         throw new ForbiddenException("Multi-sales per customer is disabled. Only one sales user can be assigned.");
       }
     }
@@ -121,22 +139,22 @@ export class CustomersService {
     return customer;
   }
 
-  async batchAssignSales(dto: BatchAssignSalesDto, factoryId: string): Promise<{ updatedCount: number }> {
-    const salesUsers = await this.userModel.find({ _id: { $in: dto.salesUserIds }, roles: Role.SALES }).exec();
+  async batchAssignSales(dto: BatchAssignUsersDto, factoryId: string): Promise<{ updatedCount: number }> {
+    const salesUsers = await this.userModel.find({ _id: { $in: dto.assignedUserIds }, roles: Role.SALES }).exec();
 
-    if (salesUsers.length !== dto.salesUserIds.length) {
+    if (salesUsers.length !== dto.assignedUserIds.length) {
       const foundIds = salesUsers.map((u) => (u._id as unknown as string).toString());
-      const missing = dto.salesUserIds.filter((id) => !foundIds.includes(id));
+      const missing = dto.assignedUserIds.filter((id) => !foundIds.includes(id));
       throw new NotFoundException(`Sales users not found or do not have SALES role: ${missing.join(", ")}`);
     }
 
     const multiSales = await this.settingsService.getMultiSalesPerCustomer();
-    if (!multiSales && dto.salesUserIds.length > 1) {
+    if (!multiSales && dto.assignedUserIds.length > 1) {
       throw new ForbiddenException("Multi-sales per customer is disabled. Only one sales user can be assigned.");
     }
 
     const result = await this.customerModel
-      .updateMany({ _id: { $in: dto.customerIds }, factoryId, isActive: true }, { $set: { allowedSalesUserIds: dto.salesUserIds } })
+      .updateMany({ _id: { $in: dto.customerIds }, factoryId, isActive: true }, { $set: { assignedUserIds: dto.assignedUserIds } })
       .exec();
 
     if (result.matchedCount === 0) {
