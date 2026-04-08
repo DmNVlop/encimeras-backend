@@ -38,7 +38,7 @@ Crea una nueva configuración para la fábrica actual, o actualiza una existente
 
 - **URL**: `POST /document-settings`
 - **Auth**: Requerido (JWT)
-- **Roles**: `ADMIN`
+- **Roles**: `ADMIN`, `OWNER`
 - **Body**:
 
   ```json
@@ -74,7 +74,7 @@ Devuelve la configuración de documentos para la fábrica del usuario autenticad
 
 - **URL**: `GET /document-settings`
 - **Auth**: Requerido (JWT)
-- **Roles**: `ADMIN`, `SALES`
+- **Roles**: `ADMIN`, `OWNER`, `SALES`
 - **Respuesta** (200 OK):
 
   ```json
@@ -97,7 +97,7 @@ Obtiene los detalles de una configuración específica por su ID.
 
 - **URL**: `GET /document-settings/:id`
 - **Auth**: Requerido (JWT)
-- **Roles**: `ADMIN`, `SALES`
+- **Roles**: `ADMIN`, `OWNER`, `SALES`
 - **Respuesta** (200 OK):
   ```json
   {
@@ -105,9 +105,54 @@ Obtiene los detalles de una configuración específica por su ID.
     "factoryId": "000000000000000000000000",
     "userId": null,
     "validityDays": 30,
-    "footerText": "Presupuesto válido por 30 días desde su emisión. Pasado este plazo será necesaria una nueva validación de precios y condiciones. Validez 30 días.",
+    "footerText": "Presupuesto válido por 30 días desde su emisión...",
     "createdAt": "2024-03-01T10:00:00.000Z",
     "updatedAt": "2024-03-01T10:00:00.000Z"
+  }
+  ```
+
+### 4. Actualizar configuración
+
+Modifica una configuración existente.
+
+- **URL**: `PATCH /document-settings/:id`
+- **Auth**: Requerido (JWT)
+- **Roles**: `ADMIN`, `OWNER`
+- **Body**:
+
+  ```json
+  {
+    "validityDays": 45,
+    "footerText": "Presupuesto válido por 45 días. Validez 45 días."
+  }
+  ```
+
+  > **Nota**: Solo se requieren los campos que se desean actualizar.
+
+- **Respuesta** (200 OK):
+  ```json
+  {
+    "_id": "65db...",
+    "factoryId": "000000000000000000000000",
+    "userId": null,
+    "validityDays": 45,
+    "footerText": "Presupuesto válido por 45 días. Validez 45 días.",
+    "createdAt": "2024-03-01T10:00:00.000Z",
+    "updatedAt": "2024-03-05T14:30:00.000Z"
+  }
+  ```
+
+### 5. Eliminar configuración
+
+Elimina una configuración de documentos. Si se elimina la configuración por defecto (`userId: null`), el sistema usará los valores por defecto hardcoded.
+
+- **URL**: `DELETE /document-settings/:id`
+- **Auth**: Requerido (JWT)
+- **Roles**: `ADMIN`, `OWNER`
+- **Respuesta** (200 OK):
+  ```json
+  {
+    "message": "Configuración eliminada correctamente"
   }
   ```
 
@@ -163,7 +208,7 @@ Elimina una configuración de documentos. Si se elimina la configuración por de
 | Código | Causa                                                                                      |
 | :----- | :----------------------------------------------------------------------------------------- |
 | `401`  | Token JWT no proporcionado o inválido.                                                     |
-| `403`  | El usuario no tiene el rol requerido (`ADMIN` o `SALES`).                                  |
+| `403`  | El usuario no tiene el rol requerido (`ADMIN`, `OWNER` o `SALES`).                         |
 | `404`  | La configuración con el ID especificado no existe o no pertenece a la fábrica del usuario. |
 | `400`  | El cuerpo de la solicitud no pasa la validación (ej: `validityDays` menor a 1).            |
 

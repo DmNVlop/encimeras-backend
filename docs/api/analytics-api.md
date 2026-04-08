@@ -7,7 +7,7 @@ Esta documentación detalla cómo integrar el nuevo endpoint de analíticas en e
 - **Ruta:** `/admin/analytics/summary`
 - **Método:** `GET`
 - **Autenticación:** Requiere `Bearer Token` (JWT).
-- **Permisos:** Solo usuarios con rol `ADMIN`.
+- **Permisos:** Solo usuarios con rol `ADMIN` u `OWNER`.
 
 ---
 
@@ -90,11 +90,11 @@ Utiliza un **Gráfico de Líneas o Área** para `trends.dailyQuotes`.
 
 ## 5. Manejo de Errores Comunes
 
-| Código             | Error                      | Causa                                                |
-| :----------------- | :------------------------- | :--------------------------------------------------- |
-| `401 Unauthorized` | Token inválido o expirado. | El usuario debe loguearse de nuevo.                  |
-| `403 Forbidden`    | El usuario no es ADMIN.    | Se intenta acceder con un rol de cliente o vendedor. |
-| `400 Bad Request`  | Formato de fecha inválido. | El query param no cumple el formato ISO8601.         |
+| Código             | Error                            | Causa                                        |
+| :----------------- | :------------------------------- | :------------------------------------------- |
+| `401 Unauthorized` | Token inválido o expirado.       | El usuario debe loguearse de nuevo.          |
+| `403 Forbidden`    | El usuario no es ADMIN ni OWNER. | Se intenta acceder con un rol sin permisos.  |
+| `400 Bad Request`  | Formato de fecha inválido.       | El query param no cumple el formato ISO8601. |
 
 ---
 

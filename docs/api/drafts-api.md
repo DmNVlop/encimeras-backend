@@ -34,6 +34,16 @@ Este módulo permite a los usuarios autenticados guardar presupuestos temporales
 
 Base URL: `/drafts`
 
+Todos los endpoints requieren autenticación JWT.
+
+| Método   | Endpoint      | Roles                             | Descripción                      |
+| :------- | :------------ | :-------------------------------- | :------------------------------- |
+| `GET`    | `/drafts`     | `ADMIN`, `OWNER`, `SALES`, `USER` | Lista de borradores del usuario. |
+| `POST`   | `/drafts`     | `ADMIN`, `OWNER`, `SALES`, `USER` | Crear nuevo borrador.            |
+| `GET`    | `/drafts/:id` | `ADMIN`, `OWNER`, `SALES`, `USER` | Obtener borrador por ID.         |
+| `PUT`    | `/drafts/:id` | `ADMIN`, `OWNER`, `SALES`, `USER` | Actualizar borrador.             |
+| `DELETE` | `/drafts/:id` | `ADMIN`, `OWNER`, `SALES`, `USER` | Eliminar borrador.               |
+
 ### 1. Obtener todos los borradores activos
 
 Devuelve la lista de borradores no convertidos del usuario autenticado (`userId`).

@@ -16,7 +16,7 @@ Estos endpoints permiten manipular las piezas (`mainPieces`) de un presupuesto e
 
 - **Endpoint**: `POST /quotes/:id/pieces`
 - **Autenticación**: JWT requerido
-- **Roles**: `ADMIN`, `SALES`
+- **Roles**: `ADMIN`, `OWNER`, `SALES`
 - **Propósito**: Agregar una nueva pieza a un presupuesto existente y recalcular totales.
 
 #### Request
@@ -62,7 +62,7 @@ Devuelve el presupuesto completo actualizado con las mismas estructuras que `GET
 
 - **Endpoint**: `PATCH /quotes/:id/pieces/:pieceId`
 - **Autenticación**: JWT requerido
-- **Roles**: `ADMIN`, `SALES`
+- **Roles**: `ADMIN`, `OWNER`, `SALES`
 - **Propósito**: Modificar los atributos de una pieza existente (material, dimensiones, atributos, addons) y recalcular totales.
 
 #### Request
@@ -99,7 +99,7 @@ Devuelve el presupuesto completo actualizado.
 
 - **Endpoint**: `DELETE /quotes/:id/pieces/:pieceId`
 - **Autenticación**: JWT requerido
-- **Roles**: `ADMIN`, `SALES`
+- **Roles**: `ADMIN`, `OWNER`, `SALES`
 - **Propósito**: Eliminar una pieza de un presupuesto existente y recalcular totales.
 
 #### Request

@@ -47,16 +47,16 @@ _\*Nota: Si no se envía `officialName` para un `INDIVIDUAL`, el backend lo gene
 
 ## 2. API Endpoints: Clientes (`/customers`)
 
-| Método   | Endpoint                        | Roles             | Descripción                              |
-| :------- | :------------------------------ | :---------------- | :--------------------------------------- |
-| `GET`    | `/customers`                    | `ADMIN`, `SALES`  | Lista de clientes activos.               |
-| `GET`    | `/customers/:id`                | `ADMIN`, `SALES`  | Detalle de un cliente.                   |
-| `POST`   | `/customers`                    | `ADMIN`           | Crear nuevo cliente.                     |
-| `PATCH`  | `/customers/:id`                | `ADMIN`, `USER`\* | Actualizar información.                  |
-| `DELETE` | `/customers/:id`                | `ADMIN`           | Desactivar cliente (Soft Delete).        |
-| `POST`   | `/customers/:id/link/:userId`   | `ADMIN`           | Vincular cliente a un usuario de acceso. |
-| `PATCH`  | `/customers/batch/assign-sales` | `ADMIN`           | Asignar vendedores a múltiples clientes. |
-| `DELETE` | `/customers/batch`              | `ADMIN`           | Desactivar múltiples clientes.           |
+| Método   | Endpoint                        | Roles                      | Descripción                              |
+| :------- | :------------------------------ | :------------------------- | :--------------------------------------- |
+| `GET`    | `/customers`                    | `ADMIN`, `OWNER`, `SALES`  | Lista de clientes activos.               |
+| `GET`    | `/customers/:id`                | `ADMIN`, `OWNER`, `SALES`  | Detalle de un cliente.                   |
+| `POST`   | `/customers`                    | `ADMIN`, `OWNER`           | Crear nuevo cliente.                     |
+| `PATCH`  | `/customers/:id`                | `ADMIN`, `OWNER`, `USER`\* | Actualizar información.                  |
+| `DELETE` | `/customers/:id`                | `ADMIN`, `OWNER`           | Desactivar cliente (Soft Delete).        |
+| `POST`   | `/customers/:id/link/:userId`   | `ADMIN`, `OWNER`           | Vincular cliente a un usuario de acceso. |
+| `PATCH`  | `/customers/batch/assign-sales` | `ADMIN`, `OWNER`           | Asignar vendedores a múltiples clientes. |
+| `DELETE` | `/customers/batch`              | `ADMIN`, `OWNER`           | Desactivar múltiples clientes.           |
 
 _\*Restricción: Roles `USER` solo pueden editar su perfil si `platformUserId` coincide con su ID de sesión._
 
@@ -157,14 +157,14 @@ Define descuentos dinámicos aplicables atomáticamente por el motor de precios.
 
 ## 4. API Endpoints: Reglas de Descuento (`/discount-rules`)
 
-Reservado exclusivamente para **ADMINS**.
+Accesible para **ADMIN** y **OWNER** (este último solo para reglas de su fábrica).
 
-| Método   | Endpoint              | Descripción                |
-| :------- | :-------------------- | :------------------------- |
-| `GET`    | `/discount-rules`     | Listado de reglas activas. |
-| `POST`   | `/discount-rules`     | Crear regla nueva.         |
-| `PATCH`  | `/discount-rules/:id` | Modificar.                 |
-| `DELETE` | `/discount-rules/:id` | Desactivar regla.          |
+| Método   | Endpoint              | Roles            | Descripción                |
+| :------- | :-------------------- | :--------------- | :------------------------- |
+| `GET`    | `/discount-rules`     | `ADMIN`, `OWNER` | Listado de reglas activas. |
+| `POST`   | `/discount-rules`     | `ADMIN`, `OWNER` | Crear regla nueva.         |
+| `PATCH`  | `/discount-rules/:id` | `ADMIN`, `OWNER` | Modificar.                 |
+| `DELETE` | `/discount-rules/:id` | `ADMIN`, `OWNER` | Desactivar regla.          |
 
 ---
 

@@ -47,7 +47,7 @@ Cada línea representa un presupuesto independiente (ej: una cocina o una isla).
 Retorna solo las cabeceras para optimizar listados. El filtrado por propiedad se hace mediante el `userId`.
 
 - **URL**: `GET /orders`
-- **Auth**: Requerido (Admin/Ventas/User)
+- **Auth**: Requerido (Admin/Owner/Ventas/User)
 - **QueryParams**: `status` (opcional)
 
 ### 2.2 Ver Detalle de Orden
