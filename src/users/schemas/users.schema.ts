@@ -1,11 +1,11 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
-import { Document } from "mongoose";
+import { Document, Schema as MongooseSchema } from "mongoose";
 import { Role } from "../../auth/enums/role.enum";
 
 @Schema({ timestamps: true })
 export class User extends Document {
   @Prop({ required: true, unique: true })
-  username: string; // O email, lo que prefieras usar para login
+  username: string;
 
   @Prop({ required: true })
   password: string;
@@ -13,14 +13,23 @@ export class User extends Document {
   @Prop({ required: true, type: [String], enum: Role, default: [Role.USER] })
   roles: Role[];
 
-  @Prop()
-  name?: string; // Nombre real para mostrar en el UI
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: "Factory" })
+  factoryId?: string;
 
   @Prop()
-  email?: string; // Útil para notificaciones
+  name?: string;
 
   @Prop()
-  phone?: string; // Teléfono para mostrar en el UI
+  email?: string;
+
+  @Prop()
+  phone?: string;
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: "User" })
+  ownerId?: string;
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: "User", required: true })
+  createdBy: string;
 }
 
 export const UsersSchema = SchemaFactory.createForClass(User);

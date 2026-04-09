@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsString, IsNotEmpty, IsEmail, IsArray, IsEnum, IsOptional, MinLength } from "class-validator";
+import { IsString, IsNotEmpty, IsEmail, IsArray, IsEnum, IsOptional, MinLength, IsMongoId } from "class-validator";
 import { Role } from "../../auth/enums/role.enum";
 
 export class CreateUserDto {
@@ -32,6 +32,14 @@ export class CreateUserDto {
   roles?: Role[];
 
   @ApiPropertyOptional({
+    description: "Factory ID para usuarios de una fábrica específica",
+    example: "507f1f77bcf86cd799439011",
+  })
+  @IsMongoId()
+  @IsOptional()
+  factoryId?: string;
+
+  @ApiPropertyOptional({
     description: "Nombre real del usuario",
     example: "Juan Pérez",
   })
@@ -54,4 +62,12 @@ export class CreateUserDto {
   @IsString()
   @IsOptional()
   phone?: string;
+
+  @ApiPropertyOptional({
+    description: "ID del usuario OWNER que gestiona este usuario (requerido para SALES cuando lo crea ADMIN)",
+    example: "507f1f77bcf86cd799439011",
+  })
+  @IsMongoId()
+  @IsOptional()
+  ownerId?: string;
 }

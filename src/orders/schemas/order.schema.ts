@@ -10,6 +10,9 @@ export class OrderHeader {
   @Prop({ required: true, index: true })
   userId: string; // ID del creador de la orden (Vendedor o Usuario)
 
+  @Prop({ required: true, index: true })
+  orderName: string; // Nombre identificador del presupuesto (único por usuario)
+
   @Prop({ index: true })
   customerId?: string; // ID del cliente final B2B
 
@@ -81,3 +84,5 @@ export class Order extends Document {
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);
+
+OrderSchema.index({ "header.userId": 1, "header.orderName": 1 }, { unique: true });

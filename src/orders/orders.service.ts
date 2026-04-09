@@ -17,19 +17,72 @@ export class OrdersService {
   ) {}
 
   /**
+   * Busca el siguiente nombre disponible para un orderName que ya existe.
+   * Si el nombre base no existe, lo retorna tal cual.
+   * Si existe, busca el siguiente número disponible en el patrón "Nombre (n)".
+   */
+  private async findNextAvailableOrderName(userId: string, baseName: string): Promise<string> {
+    const escapedName = baseName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(`^${escapedName}\\s*\\((\\d+)\\)$`);
+
+    const existingOrders = await this.orderModel
+      .find({
+        "header.userId": userId,
+        "header.orderName": { $regex: pattern },
+      })
+      .select("header.orderName")
+      .lean();
+
+    const usedNumbers = new Set(
+      existingOrders.map((order) => {
+        const match = order.header.orderName.match(/\((\d+)\)$/);
+        return match ? parseInt(match[1], 10) : 0;
+      }),
+    );
+
+    let nextNumber = 1;
+    while (usedNumbers.has(nextNumber)) {
+      nextNumber++;
+    }
+
+    return `${baseName} (${nextNumber})`;
+  }
+
+  /**
+   * Intenta guardar una orden, manejando conflictos de nombre único con auto-numeración.
+   */
+  private async saveOrderWithAutoNaming(order: InstanceType<Model<Order>>, userId: string, baseName: string): Promise<Order> {
+    try {
+      return await order.save();
+    } catch (error: any) {
+      if (error.code === 11000) {
+        const newName = await this.findNextAvailableOrderName(userId, baseName);
+        (order as any).header.orderName = newName;
+        return this.saveOrderWithAutoNaming(order, userId, newName);
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Obtiene todas las órdenes pero filtrando solo el "Shared Header".
    * Si se pasa ownerId, se filtra para que el usuario solo vea lo suyo.
    */
   async findAllHeaders(status?: string, ownerId?: string): Promise<any[]> {
     const query: any = {};
     if (status) query["header.status"] = status;
-    if (ownerId) query["header.userId"] = ownerId; // Asumimos que userId guarda el ID de usuario único
+    if (ownerId) query["header.userId"] = ownerId;
 
-    return this.orderModel
-      .find(query)
-      .select("header") // <--- Proyección: Solo traemos la cabecera
-      .sort({ "header.orderDate": -1 }) // Ordenar por las más recientes
-      .lean(); // Retorna objetos planos de JS (más rápido que documentos Mongoose)
+    return this.orderModel.find(query).select("header").sort({ "header.orderDate": -1 }).lean();
+  }
+
+  async findAllByFactory(factoryId: string, status?: string): Promise<any[]> {
+    const query: any = {};
+    if (status) query["header.status"] = status;
+
+    const orders = await this.orderModel.find(query).select("header").sort({ "header.orderDate": -1 }).lean();
+
+    return orders;
   }
 
   /**
@@ -41,6 +94,16 @@ export class OrdersService {
     if (ownerId) query["header.userId"] = ownerId;
 
     const order = await this.orderModel.findOne(query).lean();
+
+    if (!order) {
+      throw new NotFoundException(`La orden con ID ${id} no existe o no tienes permiso para verla.`);
+    }
+
+    return order as unknown as Order;
+  }
+
+  async findOneByFactory(id: string, factoryId: string): Promise<Order> {
+    const order = await this.orderModel.findById(id).lean();
 
     if (!order) {
       throw new NotFoundException(`La orden con ID ${id} no existe o no tienes permiso para verla.`);
@@ -69,6 +132,7 @@ export class OrdersService {
     const newOrder = new this.orderModel({
       header: {
         orderNumber: orderNumber,
+        orderName: createOrderDto.orderName,
         userId: userId,
         customerId: createOrderDto.customerId || draft.core.customerId,
         status: "PENDING",
@@ -93,7 +157,7 @@ export class OrdersService {
     newOrder.header.totalDiscount = (draft as any).discountAmount || 0;
 
     // 5. Guardar Orden y "Quemar" el Borrador
-    const savedOrder = await newOrder.save();
+    const savedOrder = await this.saveOrderWithAutoNaming(newOrder, userId, createOrderDto.orderName);
     await this.draftsService.markAsConverted(draft._id);
 
     // Convertir a Objeto Plano (Limpia toda la basura interna de Mongoose)
@@ -141,7 +205,7 @@ export class OrdersService {
     return updatedOrder;
   }
 
-  async createFromCart(userId: string): Promise<Order> {
+  async createFromCart(userId: string, orderName: string): Promise<Order> {
     // 1. Recuperar el Carrito ACTIVO
     const cartData = await this.cartService.getOrCreateCart(userId);
 
@@ -168,6 +232,7 @@ export class OrdersService {
     const newOrder = new this.orderModel({
       header: {
         orderNumber: orderNumber,
+        orderName: orderName,
         userId: userId,
         customerId: cartData.customerId ?? (cartData.items.length > 0 ? cartData.items[0].core?.customerId : undefined),
         status: "PENDING",
@@ -181,7 +246,7 @@ export class OrdersService {
     });
 
     // 5. Guardar Orden
-    const savedOrder = await newOrder.save();
+    const savedOrder = await this.saveOrderWithAutoNaming(newOrder, userId, orderName);
 
     // 6. "Cerrar" el carrito (Marcar como convertido)
     // Usamos el modelo para actualizar status.

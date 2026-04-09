@@ -26,8 +26,9 @@ export class AuthService {
     const payload = {
       name: user.name,
       username: user.username,
-      sub: user._id, // Usamos _id de Mongo como sub
+      sub: user._id,
       roles: user.roles,
+      factoryId: user.factoryId || null,
     };
 
     return {
@@ -37,6 +38,7 @@ export class AuthService {
         name: user.name,
         username: user.username,
         roles: user.roles,
+        factoryId: user.factoryId || null,
       },
     };
   }

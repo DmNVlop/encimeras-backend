@@ -385,19 +385,17 @@ export class CartService {
   /**
    * Inicia el proceso de checkout agregando un trabajo a la cola de BullMQ
    */
-  async checkout(userId: string): Promise<any> {
+  async checkout(userId: string, orderName: string): Promise<any> {
     const cart = await this.cartModel.findOne({ userId, status: "ACTIVE" }).exec();
 
     if (!cart || cart.items.length === 0) {
       throw new BadRequestException("El carrito está vacío o no existe.");
     }
 
-    // El carrito se queda bloqueado emocionalmente? No, simplemente lo procesamos.
-    // En una implementación real, podríamos ponerle un status 'PROCESSING' para evitar ediciones.
-
     const job = await this.cartQueue.add("process-checkout", {
       userId,
       cartId: cart._id,
+      orderName,
     });
 
     return {

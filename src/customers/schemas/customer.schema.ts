@@ -95,6 +95,12 @@ export class Customer {
 
   @Prop({ type: Address })
   address: Address;
+
+  @Prop({ type: [MongooseSchema.Types.ObjectId], ref: "User", default: [] })
+  assignedUserIds: string[];
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: "User" })
+  createdBy: string;
 }
 
 export const CustomerSchema = SchemaFactory.createForClass(Customer);

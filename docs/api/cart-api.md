@@ -20,14 +20,16 @@ Este módulo gestiona la agrupación de presupuestos antes de convertirlos en un
 
 ## 2. Endpoints
 
-### 2.1 Obtener Carrito Actual
+Todos los endpoints requieren autenticación JWT.
 
-Devuelve el carrito activo del usuario logueado, con los ítems **hidratados** (patrón BFF). El carrito está vinculado al `userId` del token JWT.
-
-- **URL**: `GET /cart`
-- **Auth**: Requerido (JWT)
-
-#### Resumen de Totales en el Carrito:
+| Método   | Endpoint          | Roles                             | Descripción                         |
+| :------- | :---------------- | :-------------------------------- | :---------------------------------- |
+| `GET`    | `/cart`           | `ADMIN`, `OWNER`, `SALES`, `USER` | Obtener carrito actual (hydratado). |
+| `POST`   | `/cart/items`     | `ADMIN`, `OWNER`, `SALES`, `USER` | Añadir configuración al carrito.    |
+| `PUT`    | `/cart/items/:id` | `ADMIN`, `OWNER`, `SALES`, `USER` | Actualizar ítem del carrito.        |
+| `DELETE` | `/cart/items/:id` | `ADMIN`, `OWNER`, `SALES`, `USER` | Eliminar ítem del carrito.          |
+| `DELETE` | `/cart`           | `ADMIN`, `OWNER`, `SALES`, `USER` | Vaciar carrito completo.            |
+| `POST`   | `/cart/checkout`  | `ADMIN`, `OWNER`, `SALES`         | Crear orden desde el carrito.       |
 
 Además de los ítems, el objeto raíz del carrito incluye:
 

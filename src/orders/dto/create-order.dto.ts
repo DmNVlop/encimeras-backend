@@ -3,6 +3,10 @@ import { Type } from "class-transformer";
 
 // Datos mínimos para promover un borrador a orden
 export class CreateOrderDto {
+  @IsString()
+  @IsNotEmpty()
+  orderName: string; // Nombre identificador del presupuesto (obligatorio, único por usuario)
+
   @IsMongoId()
   @IsNotEmpty()
   draftId: string; // Obligatorio: la orden SIEMPRE nace de un borrador validado

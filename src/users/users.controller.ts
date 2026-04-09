@@ -1,12 +1,15 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, ForbiddenException } from "@nestjs/common";
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, ForbiddenException, Query } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
 import { UsersService } from "./users.service";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
+import { TransferOwnerDto } from "./dto/transfer-owner.dto";
+import { BatchTransferDto } from "./dto/batch-transfer.dto";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { Role } from "../auth/enums/role.enum";
+import { GetUser } from "../auth/decorators/get-user.decorator";
 
 @ApiTags("Users")
 @ApiBearerAuth()
@@ -15,65 +18,95 @@ import { Role } from "../auth/enums/role.enum";
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Roles(Role.ADMIN)
   @Post()
-  @ApiOperation({ summary: "Crear un nuevo usuario (Solo Admin)" })
-  @ApiResponse({ status: 201, description: "Usuario creado con éxito." })
-  @ApiResponse({ status: 409, description: "El usuario ya existe." })
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.create(createUserDto);
+  @Roles(Role.ADMIN, Role.OWNER)
+  @ApiOperation({ summary: "Create a new user (Admin or Owner)" })
+  @ApiResponse({ status: 201, description: "User created successfully." })
+  @ApiResponse({ status: 409, description: "User already exists." })
+  create(@Body() createUserDto: CreateUserDto, @GetUser() user: any) {
+    return this.usersService.create(createUserDto, user.roles, user.userId, user.factoryId);
   }
 
-  @Roles(Role.ADMIN)
   @Get()
-  @ApiOperation({ summary: "Obtener lista de todos los usuarios (Solo Admin)" })
-  @ApiResponse({ status: 200, description: "Lista de usuarios obtenida." })
-  findAll() {
-    return this.usersService.findAll();
+  @Roles(Role.ADMIN, Role.OWNER)
+  @ApiOperation({ summary: "Get all users (Admin or Owner by factory). Optional: ?role=SALES to filter, ?managed=true for OWNER to see only managed SALES" })
+  @ApiResponse({ status: 200, description: "List of users obtained." })
+  findAll(@Query("role") role?: string, @Query("managed") managed?: string, @GetUser() user?: any) {
+    if (user?.roles.includes(Role.OWNER) && user?.factoryId) {
+      if (managed === "true") {
+        return this.usersService.findManagedUsers(user.userId);
+      }
+      return this.usersService.findAllByFactory(user.factoryId);
+    }
+    return this.usersService.findAll(role);
   }
 
-  @Roles(Role.ADMIN, Role.USER, Role.SALES, Role.WORKER)
   @Get(":id")
-  @ApiOperation({ summary: "Obtener un usuario por ID (Admin o propio usuario)" })
-  @ApiResponse({ status: 200, description: "Usuario encontrado." })
-  @ApiResponse({ status: 403, description: "Prohibido (cuando no es admin ni es el propio usuario)." })
-  @ApiResponse({ status: 404, description: "Usuario no encontrado." })
+  @Roles(Role.ADMIN, Role.OWNER, Role.USER, Role.SALES, Role.WORKER)
+  @ApiOperation({ summary: "Get a user by ID (Admin, Owner or own user)" })
+  @ApiResponse({ status: 200, description: "User found." })
+  @ApiResponse({ status: 403, description: "Forbidden." })
+  @ApiResponse({ status: 404, description: "User not found." })
   findOne(@Param("id") id: string, @Req() req: any) {
     const user = req.user;
-    if (!user.roles.includes(Role.ADMIN) && user.userId !== id) {
-      throw new ForbiddenException("No tienes permiso para ver este perfil");
+    if (!user.roles.includes(Role.ADMIN) && !user.roles.includes(Role.OWNER) && user.userId !== id) {
+      throw new ForbiddenException("You do not have permission to view this profile");
     }
     return this.usersService.findOne(id);
   }
 
-  @Roles(Role.ADMIN, Role.USER, Role.SALES, Role.WORKER)
   @Patch(":id")
-  @ApiOperation({ summary: "Actualizar un usuario (Admin o propio usuario)" })
-  @ApiResponse({ status: 200, description: "Usuario actualizado." })
-  @ApiResponse({ status: 403, description: "Prohibido (cuando no es admin ni es el propio usuario)." })
-  @ApiResponse({ status: 404, description: "Usuario no encontrado." })
-  update(@Param("id") id: string, @Body() updateUserDto: UpdateUserDto, @Req() req: any) {
-    const user = req.user;
-
-    // Si no es ADMIN, solo puede actualizarse a sí mismo
-    if (!user.roles.includes(Role.ADMIN) && user.userId !== id) {
-      throw new ForbiddenException("No tienes permiso para actualizar este usuario");
+  @Roles(Role.ADMIN, Role.OWNER, Role.USER, Role.SALES, Role.WORKER)
+  @ApiOperation({ summary: "Update a user (Admin, Owner or own user)" })
+  @ApiResponse({ status: 200, description: "User updated." })
+  @ApiResponse({ status: 403, description: "Forbidden." })
+  @ApiResponse({ status: 404, description: "User not found." })
+  update(@Param("id") id: string, @Body() updateUserDto: UpdateUserDto, @GetUser() user: any) {
+    if (!user.roles.includes(Role.ADMIN) && !user.roles.includes(Role.OWNER) && user.userId !== id) {
+      throw new ForbiddenException("You do not have permission to update this user");
     }
 
-    // Si no es ADMIN, no permitimos que cambie sus propios roles
     if (!user.roles.includes(Role.ADMIN) && updateUserDto.roles) {
       delete updateUserDto.roles;
     }
 
-    return this.usersService.update(id, updateUserDto);
+    return this.usersService.update(id, updateUserDto, user.roles, user.factoryId);
   }
 
-  @Roles(Role.ADMIN)
   @Delete(":id")
-  @ApiOperation({ summary: "Eliminar un usuario (Solo Admin)" })
-  @ApiResponse({ status: 204, description: "Usuario eliminado." })
-  @ApiResponse({ status: 404, description: "Usuario no encontrado." })
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: "Delete a user (Admin only)" })
+  @ApiResponse({ status: 204, description: "User deleted." })
+  @ApiResponse({ status: 404, description: "User not found." })
   remove(@Param("id") id: string) {
     return this.usersService.remove(id);
+  }
+
+  @Get("managed")
+  @Roles(Role.OWNER)
+  @ApiOperation({ summary: "Get SALES users managed by the current OWNER" })
+  @ApiResponse({ status: 200, description: "List of managed SALES users." })
+  @ApiResponse({ status: 404, description: "Owner not found." })
+  findManaged(@GetUser() user: any) {
+    return this.usersService.findManagedUsers(user.userId);
+  }
+
+  @Post(":id/transfer-owner")
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: "Transfer ownership of a SALES user to another OWNER (Admin only)" })
+  @ApiResponse({ status: 200, description: "Ownership transferred successfully." })
+  @ApiResponse({ status: 403, description: "Forbidden - Only ADMIN can transfer ownership." })
+  @ApiResponse({ status: 404, description: "User or new owner not found." })
+  transferOwnership(@Param("id") id: string, @Body() transferDto: TransferOwnerDto, @GetUser() user: any) {
+    return this.usersService.transferOwnership(id, transferDto.newOwnerId, user.roles);
+  }
+
+  @Post("batch-transfer")
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: "Batch transfer ownership of multiple SALES users to another OWNER (Admin only)" })
+  @ApiResponse({ status: 200, description: "Batch transfer completed." })
+  @ApiResponse({ status: 403, description: "Forbidden - Only ADMIN can perform batch transfer." })
+  batchTransferOwnership(@Body() batchTransferDto: BatchTransferDto, @GetUser() user: any) {
+    return this.usersService.batchTransferOwnership(batchTransferDto.userIds, batchTransferDto.newOwnerId, user.roles);
   }
 }
