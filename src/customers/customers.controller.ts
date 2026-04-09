@@ -19,16 +19,16 @@ export class CustomersController {
   constructor(private readonly customersService: CustomersService) {}
 
   @Post()
-  @Roles(Role.ADMIN, Role.OWNER)
+  @Roles(Role.ADMIN, Role.OWNER, Role.SALES)
   @ApiOperation({ summary: "Create a new customer" })
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
-  create(@Body() createCustomerDto: CreateCustomerDto, @GetUser("factoryId") factoryId: string, @GetUser("userId") userId: string) {
-    if (!factoryId) throw new Error("Factory ID is required");
-    return this.customersService.create(createCustomerDto, factoryId, userId);
+  create(@Body() createCustomerDto: CreateCustomerDto, @GetUser() user: any) {
+    if (!user.factoryId) throw new Error("Factory ID is required");
+    return this.customersService.create(createCustomerDto, user.factoryId, user.userId, user.roles);
   }
 
   @Get()
-  @Roles(Role.ADMIN, Role.OWNER, Role.SALES)
+  @Roles(Role.ADMIN, Role.OWNER, Role.SALES, Role.USER)
   @ApiOperation({ summary: "List all active customers (filtered by role)" })
   findAll(@GetUser() user: any) {
     const { factoryId, userId, roles } = user;
@@ -40,11 +40,14 @@ export class CustomersController {
     if (roles.includes(Role.OWNER)) {
       return this.customersService.findAllForOwner(factoryId);
     }
-    return this.customersService.findAllForSales(factoryId, userId);
+    if (roles.includes(Role.SALES)) {
+      return this.customersService.findAllForSales(factoryId, userId);
+    }
+    return this.customersService.findAllForUser(factoryId, userId);
   }
 
   @Get(":id")
-  @Roles(Role.ADMIN, Role.OWNER, Role.SALES)
+  @Roles(Role.ADMIN, Role.OWNER, Role.SALES, Role.USER)
   @ApiOperation({ summary: "Get customer details (access controlled by role)" })
   findOne(@Param("id") id: string, @GetUser() user: any) {
     const { factoryId, userId, roles } = user;
@@ -56,12 +59,15 @@ export class CustomersController {
     if (roles.includes(Role.OWNER)) {
       return this.customersService.findOneForOwner(id, factoryId);
     }
-    return this.customersService.findOneForSales(id, factoryId, userId);
+    if (roles.includes(Role.SALES)) {
+      return this.customersService.findOneForSales(id, factoryId, userId);
+    }
+    return this.customersService.findOneForUser(id, factoryId, userId);
   }
 
   @Patch(":id")
-  @Roles(Role.ADMIN, Role.OWNER, Role.SALES)
-  @ApiOperation({ summary: "Update customer information (Admin, Owner & Sales)" })
+  @Roles(Role.ADMIN, Role.SALES)
+  @ApiOperation({ summary: "Update customer information (Admin & Sales)" })
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   update(@Param("id") id: string, @Body() updateCustomerDto: UpdateCustomerDto, @GetUser() user: any) {
     if (!user.factoryId) throw new Error("Factory ID is required");
@@ -69,15 +75,15 @@ export class CustomersController {
   }
 
   @Delete(":id")
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.SALES)
   @ApiOperation({ summary: "Deactivate a customer (Soft Delete)" })
-  remove(@Param("id") id: string, @GetUser("factoryId") factoryId: string) {
-    if (!factoryId) throw new Error("Factory ID is required");
-    return this.customersService.remove(id, factoryId);
+  remove(@Param("id") id: string, @GetUser() user: any) {
+    if (!user.factoryId) throw new Error("Factory ID is required");
+    return this.customersService.remove(id, user.factoryId, user.userId, user.roles);
   }
 
   @Post(":id/link/:userId")
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.OWNER)
   @ApiOperation({ summary: "Link customer to a platform user" })
   linkToUser(@Param("id") id: string, @Param("userId") userId: string, @GetUser("factoryId") factoryId: string) {
     if (!factoryId) throw new Error("Factory ID is required");
@@ -94,7 +100,7 @@ export class CustomersController {
   }
 
   @Delete("batch")
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.OWNER)
   @ApiOperation({ summary: "Deactivate multiple customers in batch (Soft Delete)" })
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   batchRemove(@Body() dto: BatchDeleteCustomersDto, @GetUser("factoryId") factoryId: string) {

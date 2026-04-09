@@ -17,9 +17,18 @@ export class CustomersService {
     private settingsService: GlobalSettingsService,
   ) {}
 
-  async create(createCustomerDto: CreateCustomerDto, factoryId: string, userId: string): Promise<Customer> {
+  async create(createCustomerDto: CreateCustomerDto, factoryId: string, userId: string, userRoles?: string[]): Promise<Customer> {
     const multiSales = await this.settingsService.getMultiSalesPerCustomer();
-    if (!multiSales && createCustomerDto.assignedUserIds && createCustomerDto.assignedUserIds.length > 1) {
+
+    const isSales = userRoles?.includes(Role.SALES) && !userRoles?.includes(Role.ADMIN);
+
+    let assignedUserIds = createCustomerDto.assignedUserIds || [];
+
+    if (isSales && !assignedUserIds.includes(userId)) {
+      assignedUserIds = [...assignedUserIds, userId];
+    }
+
+    if (!multiSales && assignedUserIds.length > 1) {
       throw new ForbiddenException("Multi-sales per customer is disabled. Only one sales user can be assigned.");
     }
 
@@ -27,6 +36,7 @@ export class CustomersService {
       ...createCustomerDto,
       factoryId,
       createdBy: userId,
+      assignedUserIds,
     });
     return createdCustomer.save();
   }
@@ -45,6 +55,16 @@ export class CustomersService {
         factoryId,
         isActive: true,
         $or: [{ createdBy: userId }, { assignedUserIds: userId }],
+      })
+      .exec();
+  }
+
+  async findAllForUser(factoryId: string, userId: string): Promise<Customer[]> {
+    return this.customerModel
+      .find({
+        factoryId,
+        isActive: true,
+        platformUserId: userId,
       })
       .exec();
   }
@@ -71,6 +91,20 @@ export class CustomersService {
         _id: id,
         factoryId,
         $or: [{ createdBy: userId }, { assignedUserIds: userId }],
+      })
+      .exec();
+    if (!customer) {
+      throw new NotFoundException(`Customer with ID "${id}" not found or access denied`);
+    }
+    return customer;
+  }
+
+  async findOneForUser(id: string, factoryId: string, userId: string): Promise<Customer> {
+    const customer = await this.customerModel
+      .findOne({
+        _id: id,
+        factoryId,
+        platformUserId: userId,
       })
       .exec();
     if (!customer) {
@@ -122,7 +156,19 @@ export class CustomersService {
     return updatedCustomer;
   }
 
-  async remove(id: string, factoryId: string): Promise<void> {
+  async remove(id: string, factoryId: string, currentUserId?: string, currentUserRoles?: string[]): Promise<void> {
+    const isSales = currentUserRoles?.includes(Role.SALES) && !currentUserRoles?.includes(Role.ADMIN);
+    if (isSales && currentUserId) {
+      const customer = await this.customerModel.findOne({ _id: id, factoryId }).exec();
+      if (!customer) {
+        throw new NotFoundException(`Customer with ID "${id}" not found`);
+      }
+
+      if (customer.createdBy !== currentUserId && !customer.assignedUserIds?.includes(currentUserId)) {
+        throw new ForbiddenException("You can only delete customers assigned to you");
+      }
+    }
+
     const result = await this.customerModel.updateOne({ _id: id, factoryId }, { isActive: false }).exec();
 
     if (result.matchedCount === 0) {

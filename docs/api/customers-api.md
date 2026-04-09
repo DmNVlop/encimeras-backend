@@ -47,18 +47,73 @@ _\*Nota: Si no se envía `officialName` para un `INDIVIDUAL`, el backend lo gene
 
 ## 2. API Endpoints: Clientes (`/customers`)
 
-| Método   | Endpoint                        | Roles                      | Descripción                              |
-| :------- | :------------------------------ | :------------------------- | :--------------------------------------- |
-| `GET`    | `/customers`                    | `ADMIN`, `OWNER`, `SALES`  | Lista de clientes activos.               |
-| `GET`    | `/customers/:id`                | `ADMIN`, `OWNER`, `SALES`  | Detalle de un cliente.                   |
-| `POST`   | `/customers`                    | `ADMIN`, `OWNER`           | Crear nuevo cliente.                     |
-| `PATCH`  | `/customers/:id`                | `ADMIN`, `OWNER`, `USER`\* | Actualizar información.                  |
-| `DELETE` | `/customers/:id`                | `ADMIN`, `OWNER`           | Desactivar cliente (Soft Delete).        |
-| `POST`   | `/customers/:id/link/:userId`   | `ADMIN`, `OWNER`           | Vincular cliente a un usuario de acceso. |
-| `PATCH`  | `/customers/batch/assign-sales` | `ADMIN`, `OWNER`           | Asignar vendedores a múltiples clientes. |
-| `DELETE` | `/customers/batch`              | `ADMIN`, `OWNER`           | Desactivar múltiples clientes.           |
+| Método   | Endpoint                        | Roles                             | Descripción                              |
+| :------- | :------------------------------ | :-------------------------------- | :--------------------------------------- |
+| `GET`    | `/customers`                    | `ADMIN`, `OWNER`, `SALES`, `USER` | Lista de clientes activos.               |
+| `GET`    | `/customers/:id`                | `ADMIN`, `OWNER`, `SALES`, `USER` | Detalle de un cliente.                   |
+| `POST`   | `/customers`                    | `ADMIN`, `OWNER`, `SALES`         | Crear nuevo cliente.                     |
+| `PATCH`  | `/customers/:id`                | `ADMIN`, `SALES`                  | Actualizar información.                  |
+| `DELETE` | `/customers/:id`                | `ADMIN`, `SALES`                  | Desactivar cliente (Soft Delete).        |
+| `POST`   | `/customers/:id/link/:userId`   | `ADMIN`, `OWNER`                  | Vincular cliente a un usuario de acceso. |
+| `PATCH`  | `/customers/batch/assign-sales` | `ADMIN`, `OWNER`                  | Asignar vendedores a múltiples clientes. |
+| `DELETE` | `/customers/batch`              | `ADMIN`, `OWNER`                  | Desactivar múltiples clientes.           |
 
-_\*Restricción: Roles `USER` solo pueden editar su perfil si `platformUserId` coincide con su ID de sesión._
+_\*Nota: Los roles `USER` ya no tienen acceso a PATCH. Solo pueden leer el cliente asignado a ellos._
+
+### Acceso por Rol
+
+**ADMIN:**
+
+- Puede hacer TODO
+- Acceso completo a todos los endpoints
+
+**OWNER:**
+
+- ✅ **READ**: Todos los clientes agregados en el sistema (modo solo lectura)
+- ✅ **POST**: Crear clientes y asignarlos a usuarios SALES
+- ✅ **linkToUser**: Vincular cliente a usuario de plataforma
+- ✅ **batchAssignUsers**: Asignar usuarios SALES a múltiples clientes
+- ✅ **batchRemove**: Eliminar múltiples clientes en batch
+- ❌ **PATCH**: No puede actualizar clientes individualmente
+- ❌ **DELETE**: No puede eliminar clientes individualmente
+
+**SALES:**
+
+- ✅ **READ**: Todos los clientes que le pertenecen (creados por él o asignados a él)
+- ✅ **POST**: Crear clientes (automáticamente se asignan a él)
+- ✅ **PATCH**: Actualizar clientes que le pertenecen
+- ✅ **DELETE**: Eliminar clientes que le pertenecen
+- ❌ **linkToUser**: No puede vincular clientes a usuarios
+- ❌ **batchAssignUsers**: No puede hacer asignaciones batch
+- ❌ **batchRemove**: No puede eliminar en batch
+
+**USER:**
+
+- ✅ **READ**: El cliente asignado a él (donde `platformUserId` = userId)
+- ❌ **POST**: No puede crear clientes
+- ❌ **PATCH**: No puede actualizar clientes (excepto su propio perfil si está vinculado)
+- ❌ **DELETE**: No puede eliminar clientes
+- ❌ **linkToUser**: No puede vincular clientes
+- ❌ **batchAssignUsers**: No puede hacer asignaciones batch
+- ❌ **batchRemove**: No puede eliminar en batch
+
+### Reglas de Asignación Automática
+
+1. **Cuando un SALES crea un cliente:**
+   - El campo `createdBy` se establece automáticamente con su `userId`
+   - Si no se especifica `assignedUserIds`, se añade automáticamente su `userId`
+   - Si se especifica `assignedUserIds`, se añade su `userId` si no está ya incluido
+
+2. **Validación de propiedad para SALES:**
+   - Un SALES solo puede acceder a clientes donde:
+     - `createdBy` = userId (creados por él) **O**
+     - `assignedUserIds` incluye userId (asignados a él)
+   - Esto aplica para: GET, PATCH, DELETE
+
+3. **Validación de propiedad para USER:**
+   - Un USER solo puede acceder a clientes donde:
+     - `platformUserId` = userId (cliente vinculado a su cuenta)
+   - Solo aplica para GET (lectura)
 
 ### Endpoints Batch
 
@@ -71,7 +126,7 @@ Asigna uno o más vendedores (usuarios con rol `SALES`) a múltiples clientes si
 ```json
 {
   "customerIds": ["cust1", "cust2", "cust3"],
-  "salesUserIds": ["sales1", "sales2"]
+  "assignedUserIds": ["sales1", "sales2"]
 }
 ```
 
