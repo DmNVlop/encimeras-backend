@@ -107,6 +107,6 @@ export class UsersController {
   @ApiResponse({ status: 200, description: "Batch transfer completed." })
   @ApiResponse({ status: 403, description: "Forbidden - Only ADMIN can perform batch transfer." })
   batchTransferOwnership(@Body() batchTransferDto: BatchTransferDto, @GetUser() user: any) {
-    return this.usersService.batchTransferOwnership(batchTransferDto.userIds, batchTransferDto.newOwnerId, user.roles);
+    return this.usersService.batchTransferOwnership(batchTransferDto.userIds, batchTransferDto.newOwnerId, user.roles, user.userId);
   }
 }
