@@ -15,7 +15,6 @@ import { GetUser } from "../auth/decorators/get-user.decorator";
 
 @ApiTags("Quotes")
 @Controller("quotes")
-@UseGuards(RolesGuard)
 export class QuotesController {
   constructor(private readonly quotesService: QuotesService) {}
 
@@ -35,17 +34,7 @@ export class QuotesController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
-  @Roles(Role.ADMIN, Role.SALES)
-  @Post(":id/pieces")
-  @ApiOperation({ summary: "Add a piece to an existing quote" })
-  @UsePipes(ValidationPipe)
-  addPiece(@Param("id") id: string, @Body() addPieceDto: AddPieceDto) {
-    return this.quotesService.addPiece(id, addPieceDto);
-  }
-
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.SALES)
   @Patch(":id/pieces/:pieceId")
   @ApiOperation({ summary: "Update a piece in an existing quote" })
@@ -64,7 +53,7 @@ export class QuotesController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.OWNER, Role.SALES)
   @Get()
   @ApiOperation({ summary: "Get all quotes (Admin, Owner & Sales)" })
@@ -77,7 +66,7 @@ export class QuotesController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.OWNER, Role.SALES)
   @Get(":id")
   @ApiOperation({ summary: "Get a single quote by ID (Admin, Owner & Sales)" })
@@ -90,7 +79,7 @@ export class QuotesController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.SALES)
   @Patch(":id")
   @ApiOperation({ summary: "Update a quote status (Admin & Sales)" })

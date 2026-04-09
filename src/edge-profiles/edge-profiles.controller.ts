@@ -14,7 +14,6 @@ import { Role } from "src/auth/enums/role.enum";
 
 @ApiTags("Edge Profiles")
 @Controller("edge-profiles")
-@UseGuards(RolesGuard)
 export class EdgeProfilesController {
   constructor(private readonly service: EdgeProfilesService) {}
 
@@ -29,10 +28,10 @@ export class EdgeProfilesController {
   }
 
   @Post()
-  @Roles(Role.ADMIN)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
-  @UsePipes(ValidationPipe)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @UsePipes(new ValidationPipe({ whitelist: true }))
   create(@Body() createDto: CreateEdgeProfileDto) {
     return this.service.create(createDto);
   }

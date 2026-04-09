@@ -12,7 +12,6 @@ import { Role } from "src/auth/enums/role.enum";
 
 @ApiTags("Valid Combinations")
 @Controller("valid-combinations")
-@UseGuards(RolesGuard)
 export class ValidCombinationsController {
   constructor(private readonly validCombinationsService: ValidCombinationsService) {}
 
@@ -26,17 +25,17 @@ export class ValidCombinationsController {
   }
 
   @Post()
-  @Roles(Role.ADMIN)
   @ApiOperation({ summary: "Crear una nueva combinación válida (Solo Admin)" })
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
   create(@Body() createValidCombinationDto: CreateValidCombinationDto) {
     return this.validCombinationsService.create(createValidCombinationDto);
   }
 
   @Get()
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({ summary: "Obtener todas las combinaciones válidas, opcionalmente filtradas por material (Protegido)" })
   @ApiQuery({ name: "materialId", required: false, description: "ID del material para filtrar las combinaciones" })
   findAll(@Query("materialId") materialId?: string) {
@@ -44,9 +43,9 @@ export class ValidCombinationsController {
   }
 
   @Patch(":id")
-  @Roles(Role.ADMIN)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
   @ApiOperation({ summary: "Actualizar una combinación válida por ID (Solo Admin)" })
   update(@Param("id") id: string, @Body() updateValidCombinationDto: UpdateValidCombinationDto) {
     return this.validCombinationsService.update(id, updateValidCombinationDto);

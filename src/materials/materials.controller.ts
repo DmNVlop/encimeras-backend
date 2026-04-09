@@ -13,7 +13,6 @@ import { Role } from "src/auth/enums/role.enum";
 
 @ApiTags("Materials")
 @Controller("materials")
-@UseGuards(RolesGuard) // Aplicamos RolesGuard a nivel de controlador
 export class MaterialsController {
   constructor(private readonly materialsService: MaterialsService) {}
 
@@ -32,7 +31,7 @@ export class MaterialsController {
   @Post()
   @ApiOperation({ summary: "Crear un nuevo material (Solo Admin)" })
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @UsePipes(new ValidationPipe({ whitelist: true }))
   create(@Body() createMaterialDto: CreateMaterialDto) {
@@ -42,7 +41,7 @@ export class MaterialsController {
   @Patch(":id")
   @ApiOperation({ summary: "Actualizar un material (Solo Admin)" })
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @UsePipes(new ValidationPipe({ whitelist: true }))
   update(@Param("id") id: string, @Body() updateMaterialDto: UpdateMaterialDto) {
@@ -52,7 +51,7 @@ export class MaterialsController {
   @Delete()
   @ApiOperation({ summary: "Eliminar uno o más materiales (Solo Admin)" })
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   remove(@Body() deleteMaterialsDto: DeleteMaterialsDto) {
     return this.materialsService.remove(deleteMaterialsDto.ids);
@@ -63,7 +62,7 @@ export class MaterialsController {
   @Delete(":id")
   @ApiOperation({ summary: "Eliminar un material por ID (Solo Admin)" })
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   removeOne(@Param("id") id: string) {
     return this.materialsService.remove([id]);

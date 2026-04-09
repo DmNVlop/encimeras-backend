@@ -13,7 +13,6 @@ import { Role } from "src/auth/enums/role.enum";
 
 @ApiTags("Cutouts")
 @Controller("cutouts")
-@UseGuards(RolesGuard)
 export class CutoutsController {
   constructor(private readonly service: CutoutsService) {}
 
@@ -28,37 +27,37 @@ export class CutoutsController {
   }
 
   @Post()
-  @Roles(Role.ADMIN)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
-  @UsePipes(ValidationPipe)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @UsePipes(new ValidationPipe({ whitelist: true }))
   create(@Body() createDto: CreateCutoutDto) {
     return this.service.create(createDto);
   }
 
   @Patch(":id")
-  @Roles(Role.ADMIN)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
-  @UsePipes(ValidationPipe)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @UsePipes(new ValidationPipe({ whitelist: true }))
   update(@Param("id") id: string, @Body() updateDto: UpdateCutoutDto) {
     return this.service.update(id, updateDto);
   }
 
   @Delete()
-  @Roles(Role.ADMIN)
   @ApiOperation({ summary: "Eliminar uno o más Cortes (Solo Admin)" })
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
   remove(@Body() deleteCutoutsDto: DeleteCutoutsDto) {
     return this.service.remove(deleteCutoutsDto.ids);
   }
 
   @Delete(":id")
-  @Roles(Role.ADMIN)
   @ApiOperation({ summary: "Eliminar un Cortes por ID (Solo Admin)" })
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
   removeOne(@Param("id") id: string) {
     return this.service.remove([id]);
   }
