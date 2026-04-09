@@ -10,7 +10,6 @@ import { Roles } from "src/auth/decorators/roles.decorator";
 import { Role } from "src/auth/enums/role.enum";
 
 @Controller("addons")
-@UseGuards(RolesGuard)
 export class AddonsController {
   constructor(private readonly addonsService: AddonsService) {}
 
@@ -25,7 +24,7 @@ export class AddonsController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @Post()
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
@@ -34,7 +33,7 @@ export class AddonsController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @Patch(":id")
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
@@ -43,7 +42,7 @@ export class AddonsController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @Delete(":id")
   remove(@Param("id") id: string) {
