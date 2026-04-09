@@ -149,7 +149,12 @@ export class UsersService {
     return user.save();
   }
 
-  async batchTransferOwnership(userIds: string[], newOwnerId: string, currentUserRoles: string[]): Promise<{ transferred: number; failed: string[] }> {
+  async batchTransferOwnership(
+    userIds: string[],
+    newOwnerId: string,
+    currentUserRoles: string[],
+    currentUserId: string,
+  ): Promise<{ transferred: number; failed: string[] }> {
     if (!currentUserRoles.includes(Role.ADMIN)) {
       throw new ForbiddenException("Only ADMIN can perform batch transfer");
     }
@@ -176,6 +181,12 @@ export class UsersService {
         }
 
         user.ownerId = newOwnerId;
+
+        // Si no existe createdBy, asignarlo con el ID del usuario ADMIN actual
+        if (!user.createdBy) {
+          user.createdBy = currentUserId;
+        }
+
         await user.save();
         transferred++;
       } catch (error) {
