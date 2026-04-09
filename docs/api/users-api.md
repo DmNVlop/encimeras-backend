@@ -15,8 +15,11 @@ Gestión de usuarios del sistema con roles y autenticación JWT.
 | `email`     | `String`   | Email para notificaciones                                   | No          |
 | `phone`     | `String`   | Teléfono de contacto                                        | No          |
 | `factoryId` | `ObjectId` | ID de la fábrica (requerido si tiene rol `OWNER`)           | Condicional |
+| `ownerId`   | `ObjectId` | Referencia al usuario OWNER que gestiona este usuario       | Condicional |
+| `createdBy` | `ObjectId` | ID del usuario que creó este usuario                        | Sí          |
 
 > **Nota**: Los usuarios con rol `OWNER` deben tener un `factoryId` asociado para scoping de acceso a los recursos de su fábrica.
+> **Nota**: Los usuarios con rol `SALES` pueden tener un `ownerId` que referencia al usuario OWNER que los gestiona.
 
 ---
 
@@ -24,23 +27,25 @@ Gestión de usuarios del sistema con roles y autenticación JWT.
 
 Todos los endpoints requieren autenticación JWT (`@ApiBearerAuth()`).
 
-| Método   | Endpoint     | Roles             | Descripción                                |
-| :------- | :----------- | :---------------- | :----------------------------------------- |
-| `GET`    | `/users`     | `ADMIN`           | Lista de usuarios. Opcional: `?role=SALES` |
-| `GET`    | `/users/:id` | `ADMIN`, `USER`\* | Detalle de un usuario.                     |
-| `POST`   | `/users`     | `ADMIN`           | Crear nuevo usuario.                       |
-| `PATCH`  | `/users/:id` | `ADMIN`, `USER`\* | Actualizar usuario.                        |
-| `DELETE` | `/users/:id` | `ADMIN`           | Eliminar usuario.                          |
+| Método   | Endpoint                    | Roles                      | Descripción                                                         |
+| :------- | :-------------------------- | :------------------------- | :------------------------------------------------------------------ |
+| `GET`    | `/users`                    | `ADMIN`, `OWNER`           | Lista de usuarios. Opcional: `?role=SALES`, `?managed=true` (OWNER) |
+| `GET`    | `/users/:id`                | `ADMIN`, `OWNER`, `USER`\* | Detalle de un usuario.                                              |
+| `POST`   | `/users`                    | `ADMIN`, `OWNER`           | Crear nuevo usuario.                                                |
+| `PATCH`  | `/users/:id`                | `ADMIN`, `OWNER`, `USER`\* | Actualizar usuario.                                                 |
+| `DELETE` | `/users/:id`                | `ADMIN`                    | Eliminar usuario.                                                   |
+| `GET`    | `/users/managed`            | `OWNER`                    | Lista de usuarios SALES gestionados por el OWNER actual             |
+| `POST`   | `/users/:id/transfer-owner` | `ADMIN`                    | Transferir usuario SALES a otro OWNER                               |
+| `POST`   | `/users/batch-transfer`     | `ADMIN`                    | Transferencia masiva de usuarios SALES                              |
 
 _\*Restricción: Usuarios no-ADMIN solo pueden ver/editar su propio perfil (cuando `:id` coincide con su `userId` del token)._
 
-### Filtrado por Rol
+### Filtrado y Consulta
 
-Soporta filtrar usuarios por rol específico:
-
-| Parámetro | Tipo     | Requerido | Descripción                   |
-| :-------- | :------- | :-------- | :---------------------------- |
-| `role`    | `String` | No        | Filtrar por rol (ej: `SALES`) |
+| Parámetro | Tipo     | Requerido | Descripción                                                         |
+| :-------- | :------- | :-------- | :------------------------------------------------------------------ |
+| `role`    | `String` | No        | Filtrar por rol (ej: `SALES`)                                       |
+| `managed` | `String` | No        | Para OWNER, filtrar solo sus usuarios gestionados (`?managed=true`) |
 
 **Response 200:**
 
@@ -93,6 +98,19 @@ Para crear un usuario con rol `OWNER`, se debe incluir `factoryId`:
 }
 ```
 
+Para crear un usuario con rol `SALES`, **ADMIN** debe especificar `ownerId`:
+
+```json
+{
+  "username": "nuevo.vendedor",
+  "password": "contraseñaSegura123",
+  "roles": ["SALES"],
+  "name": "Carlos López",
+  "email": "carlos@fabricamar.com",
+  "ownerId": "65d8f1f77bcf86cd799439000"
+}
+```
+
 **Response 201:**
 
 ```json
@@ -110,10 +128,12 @@ Para crear un usuario con rol `OWNER`, se debe incluir `factoryId`:
 
 **Errores:**
 
-| Código | Descripción             |
-| :----- | :---------------------- |
-| `409`  | El `username` ya existe |
-| `400`  | `OWNER` sin `factoryId` |
+| Código | Descripción                              |
+| :----- | :--------------------------------------- |
+| `409`  | El `username` ya existe                  |
+| `400`  | `OWNER` sin `factoryId`                  |
+| `403`  | ADMIN creando SALES sin `ownerId`        |
+| `404`  | `ownerId` no existe o no tiene rol OWNER |
 
 ---
 
@@ -164,3 +184,69 @@ Los usuarios con rol `OWNER` tienen acceso exclusivo a los recursos de su fábri
 ```
 
 > **Nota**: El `factoryId` se incluye en el token JWT solo para usuarios con rol `OWNER`. El backend lo usa para filtrar consultas y aplicar FactoryScopeGuard.
+
+---
+
+## 6. Sistema de Jerarquía OWNER-SALES
+
+### Reglas de Creación
+
+| Creador   | Tipo Usuario | Comportamiento `ownerId`             | Comportamiento `createdBy` |
+| --------- | ------------ | ------------------------------------ | -------------------------- |
+| **ADMIN** | `SALES`      | **Requerido** en DTO                 | ID del ADMIN               |
+| **OWNER** | `SALES`      | Auto-asignado (ignorar si viene DTO) | ID del OWNER               |
+| **OWNER** | `USER`       | Ignorado (USER no tiene owner)       | ID del OWNER               |
+| **ADMIN** | `OWNER`      | No aplicable                         | ID del ADMIN               |
+
+### Transferencia de Propiedad
+
+Solo usuarios con rol **ADMIN** pueden transferir ownership entre OWNERs.
+
+#### Transferencia Individual
+
+**POST** `/users/:id/transfer-owner`
+
+```json
+{
+  "newOwnerId": "507f1f77bcf86cd799439022"
+}
+```
+
+#### Transferencia Masiva
+
+**POST** `/users/batch-transfer`
+
+```json
+{
+  "userIds": ["507f1f77bcf86cd799439011", "507f1f77bcf86cd799439012"],
+  "newOwnerId": "507f1f77bcf86cd799439022"
+}
+```
+
+**Response (batch):**
+
+```json
+{
+  "transferred": 2,
+  "failed": []
+}
+```
+
+### Restricciones de Transferencia
+
+1. Solo usuarios con rol **SALES** pueden ser transferidos
+2. El `newOwnerId` debe existir y tener rol **OWNER**
+3. Solo **ADMIN** puede ejecutar transferencias
+4. La transferencia actualiza `ownerId` pero NO modifica `createdBy`
+
+### Diagrama de Jerarquía
+
+```
+ADMIN
+  └── OWNER 1 (factoryA)
+        ├── SALES 1 (manager: OWNER 1)
+        └── SALES 2 (manager: OWNER 1)
+  └── OWNER 2 (factoryB)
+        └── SALES 3 (manager: OWNER 2)
+  └── USER (no owner)
+```

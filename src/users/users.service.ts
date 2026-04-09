@@ -11,8 +11,8 @@ import { Role } from "../auth/enums/role.enum";
 export class UsersService {
   constructor(@InjectModel(User.name) private readonly userModel: Model<User>) {}
 
-  async create(createUserDto: CreateUserDto, currentUserRoles: string[], currentUserFactoryId?: string): Promise<User> {
-    const { username, password, roles, factoryId } = createUserDto;
+  async create(createUserDto: CreateUserDto, currentUserRoles: string[], currentUserId: string, currentUserFactoryId?: string): Promise<User> {
+    const { username, password, roles, factoryId, ownerId } = createUserDto;
 
     const existingUser = await this.userModel.findOne({ username });
     if (existingUser) {
@@ -29,11 +29,29 @@ export class UsersService {
       }
     }
 
+    let finalOwnerId = ownerId;
+    if (roles?.includes(Role.SALES)) {
+      if (currentUserRoles.includes(Role.ADMIN)) {
+        if (!ownerId) {
+          throw new ForbiddenException("ADMIN must specify ownerId when creating SALES user");
+        }
+        const ownerUser = await this.userModel.findById(ownerId).exec();
+        if (!ownerUser || !ownerUser.roles.includes(Role.OWNER)) {
+          throw new NotFoundException(`Owner with ID ${ownerId} not found or is not an OWNER`);
+        }
+        finalOwnerId = ownerId;
+      } else if (currentUserRoles.includes(Role.OWNER)) {
+        finalOwnerId = currentUserId;
+      }
+    }
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
     const newUser = new this.userModel({
       ...createUserDto,
+      ownerId: finalOwnerId,
+      createdBy: currentUserId,
       password: hashedPassword,
     });
 
@@ -97,5 +115,74 @@ export class UsersService {
     if (!result) {
       throw new NotFoundException(`Usuario con ID "${id}" no encontrado`);
     }
+  }
+
+  async findManagedUsers(ownerId: string): Promise<User[]> {
+    const ownerUser = await this.userModel.findById(ownerId).exec();
+    if (!ownerUser || !ownerUser.roles.includes(Role.OWNER)) {
+      throw new NotFoundException(`Owner with ID ${ownerId} not found or is not an OWNER`);
+    }
+
+    return this.userModel.find({ ownerId, roles: Role.SALES }).select("-password").exec();
+  }
+
+  async transferOwnership(userId: string, newOwnerId: string, currentUserRoles: string[]): Promise<User> {
+    if (!currentUserRoles.includes(Role.ADMIN)) {
+      throw new ForbiddenException("Only ADMIN can transfer ownership");
+    }
+
+    const user = await this.userModel.findById(userId).exec();
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    if (!user.roles.includes(Role.SALES)) {
+      throw new ForbiddenException("Only SALES users can be transferred between OWNERs");
+    }
+
+    const newOwner = await this.userModel.findById(newOwnerId).exec();
+    if (!newOwner || !newOwner.roles.includes(Role.OWNER)) {
+      throw new NotFoundException(`New owner with ID ${newOwnerId} not found or is not an OWNER`);
+    }
+
+    user.ownerId = newOwnerId;
+    return user.save();
+  }
+
+  async batchTransferOwnership(userIds: string[], newOwnerId: string, currentUserRoles: string[]): Promise<{ transferred: number; failed: string[] }> {
+    if (!currentUserRoles.includes(Role.ADMIN)) {
+      throw new ForbiddenException("Only ADMIN can perform batch transfer");
+    }
+
+    const newOwner = await this.userModel.findById(newOwnerId).exec();
+    if (!newOwner || !newOwner.roles.includes(Role.OWNER)) {
+      throw new NotFoundException(`New owner with ID ${newOwnerId} not found or is not an OWNER`);
+    }
+
+    const failed: string[] = [];
+    let transferred = 0;
+
+    for (const userId of userIds) {
+      try {
+        const user = await this.userModel.findById(userId).exec();
+        if (!user) {
+          failed.push(`${userId}: User not found`);
+          continue;
+        }
+
+        if (!user.roles.includes(Role.SALES)) {
+          failed.push(`${userId}: Not a SALES user`);
+          continue;
+        }
+
+        user.ownerId = newOwnerId;
+        await user.save();
+        transferred++;
+      } catch (error) {
+        failed.push(`${userId}: ${error.message}`);
+      }
+    }
+
+    return { transferred, failed };
   }
 }

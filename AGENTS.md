@@ -163,6 +163,47 @@ export class QuoteService {
 - `RolesGuard`: Checks user roles via `@Roles()` decorator
 - `FactoryScopeGuard`: Validates factory access for OWNER role
 
+## User Hierarchy & Ownership
+
+### Owner-Sales Hierarchy System
+
+#### Schema Changes
+
+- **ownerId** (User reference): Reference to OWNER user who manages this SALES user
+- **createdBy** (User reference, required): ID of user who created this user
+
+#### Creation Rules
+
+- **ADMIN creates SALES**: `ownerId` required in DTO, must reference valid OWNER user
+- **OWNER creates SALES**: `ownerId` auto-assigned to current OWNER (ignored if provided in DTO)
+- **OWNER creates USER**: `ownerId` ignored (USER doesn't have owner)
+- **All cases**: `createdBy` automatically set to current user ID
+
+#### Transfer Rules
+
+- Only **ADMIN** can transfer ownership
+- Only **SALES** users can be transferred
+- `newOwnerId` must exist and have **OWNER** role
+- Transfer updates `ownerId` but NOT `createdBy`
+
+#### New Endpoints
+
+| Method | Endpoint                    | Roles   | Description                              |
+| ------ | --------------------------- | ------- | ---------------------------------------- |
+| `GET`  | `/users/managed`            | `OWNER` | Get SALES users managed by current OWNER |
+| `POST` | `/users/:id/transfer-owner` | `ADMIN` | Transfer SALES user to another OWNER     |
+| `POST` | `/users/batch-transfer`     | `ADMIN` | Batch transfer multiple SALES users      |
+
+#### Query Parameters for GET /users
+
+- `?managed=true`: For OWNER users, returns only their managed SALES users
+- `?role=SALES`: Filter users by role
+
+#### DTOs Created
+
+- `TransferOwnerDto`: For individual transfer (`{ newOwnerId: string }`)
+- `BatchTransferDto`: For batch transfer (`{ userIds: string[], newOwnerId: string }`)
+
 ## Module Registration Pattern
 
 ```typescript
@@ -181,6 +222,40 @@ export class EntityModule {}
 2. **Quote has no factoryId**: Factory association is lost when quote is persisted
 3. **Analytics bug**: `analytics.service.ts` filters by `header.factoryId` but field is in `items[].core.factoryId`
 4. **GlobalSettings not imported**: Module exists but NOT imported in `app.module.ts`
+
+## Recent Changes (2026-04-09)
+
+### Customers Module - Permissions Update (Revision 2)
+
+**Controller Changes (`src/customers/customers.controller.ts`):**
+
+- `POST /customers`: Añadido `Role.SALES` (SALES puede crear clientes)
+- `GET /customers`: Añadido `Role.USER` (USER puede leer cliente asignado)
+- `GET /customers/:id`: Añadido `Role.USER`
+- `PATCH /customers/:id`: Removido `Role.OWNER` (OWNER solo lectura)
+- `DELETE /customers/:id`: Añadido `Role.SALES` (con validación de propiedad)
+- `POST /customers/:id/link/:userId`: Añadido `Role.OWNER`
+- `DELETE /customers/batch`: Añadido `Role.OWNER`
+
+**Service Changes (`src/customers/customers.service.ts`):**
+
+- `create()`: Añadido parámetro `userRoles` y auto-asignación de SALES a `assignedUserIds`
+- Añadido `findAllForUser()` y `findOneForUser()` para usuarios con rol USER
+- `remove()`: Añadido validación de propiedad para SALES
+
+**Validación de Propiedad:**
+
+- **SALES**: Accede a clientes donde `createdBy = userId` o `assignedUserIds.includes(userId)`
+- **USER**: Accede a clientes donde `platformUserId = userId`
+- **OWNER**: Lee todos los clientes activos, no puede PATCH/DELETE individual
+
+**Reglas de Asignación Automática:**
+
+- Cuando un SALES crea un cliente: automáticamente se asigna como `createdBy` y se añade a `assignedUserIds`
+
+**Documentación Actualizada:**
+
+- `docs/api/customers-api.md`: Tabla de permisos actualizada y reglas detalladas
 
 ## ESLint & Prettier
 

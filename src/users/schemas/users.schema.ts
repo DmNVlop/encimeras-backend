@@ -24,6 +24,12 @@ export class User extends Document {
 
   @Prop()
   phone?: string;
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: "User" })
+  ownerId?: string;
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: "User", required: true })
+  createdBy: string;
 }
 
 export const UsersSchema = SchemaFactory.createForClass(User);
