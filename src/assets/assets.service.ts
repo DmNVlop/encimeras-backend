@@ -36,4 +36,8 @@ export class AssetsService {
       originalName: file.originalname,
     };
   }
+
+  async deleteImage(filename: string): Promise<void> {
+    await this.storage.delete(filename);
+  }
 }

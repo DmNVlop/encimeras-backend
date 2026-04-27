@@ -28,7 +28,7 @@ export class CustomersController {
   }
 
   @Get()
-  @Roles(Role.ADMIN, Role.OWNER, Role.SALES, Role.USER)
+  @Roles(Role.ADMIN, Role.OWNER, Role.WORKER, Role.SALES, Role.USER)
   @ApiOperation({ summary: "List all active customers (filtered by role)" })
   findAll(@GetUser() user: any) {
     const { factoryId, userId, roles } = user;
@@ -40,6 +40,9 @@ export class CustomersController {
     if (roles.includes(Role.OWNER)) {
       return this.customersService.findAllForOwner(factoryId);
     }
+    if (roles.includes(Role.WORKER)) {
+      return this.customersService.findAll(factoryId);
+    }
     if (roles.includes(Role.SALES)) {
       return this.customersService.findAllForSales(factoryId, userId);
     }
@@ -47,7 +50,7 @@ export class CustomersController {
   }
 
   @Get(":id")
-  @Roles(Role.ADMIN, Role.OWNER, Role.SALES, Role.USER)
+  @Roles(Role.ADMIN, Role.OWNER, Role.WORKER, Role.SALES, Role.USER)
   @ApiOperation({ summary: "Get customer details (access controlled by role)" })
   findOne(@Param("id") id: string, @GetUser() user: any) {
     const { factoryId, userId, roles } = user;
@@ -58,6 +61,9 @@ export class CustomersController {
     }
     if (roles.includes(Role.OWNER)) {
       return this.customersService.findOneForOwner(id, factoryId);
+    }
+    if (roles.includes(Role.WORKER)) {
+      return this.customersService.findOne(id, factoryId);
     }
     if (roles.includes(Role.SALES)) {
       return this.customersService.findOneForSales(id, factoryId, userId);
