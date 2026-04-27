@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { BullModule } from "@nestjs/bullmq";
+import { ConfigModule, ConfigService } from "@nestjs/config";
 import * as path from "path";
 import { join } from "path";
 
@@ -11,7 +12,6 @@ import { DatabaseModule } from "./database/database.module";
 import { MaterialsModule } from "./materials/materials.module";
 import { EdgeProfilesModule } from "./edge-profiles/edge-profiles.module";
 import { CutoutsModule } from "./cutouts/cutouts.module";
-import { ConfigModule } from "@nestjs/config";
 import { AuthModule } from "./auth/auth.module";
 import { QuotesModule } from "./quotes/quotes.module";
 import { PriceConfigsModule } from "./price-configs/price-configs.module";
@@ -30,6 +30,7 @@ import { DiscountRulesModule } from "./discount-rules/discount-rules.module";
 import { CartModule } from "./cart/cart.module";
 import { DocumentSettingsModule } from "./document-settings/document-settings.module";
 import { GlobalSettingsModule } from "./settings/global-settings.module";
+import { FactorySettingsModule } from "./factory-settings/factory-settings.module";
 
 import { AnalyticsModule } from "./analytics/analytics.module";
 
@@ -45,10 +46,21 @@ import { RedisCheckService } from "./redis-check.service";
       // envFilePath: path.resolve(__dirname, '..', '.env'), // No funcionó
       envFilePath: path.resolve(process.cwd(), ".env"), // Construye la ruta absoluta al .env
     }),
-    BullModule.forRoot({
-      connection: {
-        host: process.env.REDIS_HOST || "localhost",
-        port: parseInt(process.env.REDIS_PORT || "6379"),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const redisUrl = configService.get<string>("REDIS_URL");
+        if (redisUrl) {
+          return { connection: { url: redisUrl } };
+        }
+        return {
+          connection: {
+            host: configService.get<string>("REDIS_HOST") || "localhost",
+            port: parseInt(configService.get<string>("REDIS_PORT") || "6379"),
+            password: configService.get<string>("REDIS_PASSWORD") || undefined,
+          },
+        };
       },
     }),
 
@@ -86,6 +98,7 @@ import { RedisCheckService } from "./redis-check.service";
     CartModule,
     DocumentSettingsModule,
     GlobalSettingsModule,
+    FactorySettingsModule,
   ],
   controllers: [AppController],
   providers: [AppService, RedisCheckService],

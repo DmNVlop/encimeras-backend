@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from "@nestjs/common";
+import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { Model } from "mongoose";
 import { Customer, CustomerDocument } from "./schemas/customer.schema";
@@ -22,11 +22,8 @@ export class CustomersService {
 
     const isSales = userRoles?.includes(Role.SALES) && !userRoles?.includes(Role.ADMIN);
 
-    let assignedUserIds = createCustomerDto.assignedUserIds || [];
-
-    if (isSales && !assignedUserIds.includes(userId)) {
-      assignedUserIds = [...assignedUserIds, userId];
-    }
+    // SALES can only assign themselves — ignore any assignedUserIds from the request
+    let assignedUserIds = isSales ? [userId] : (createCustomerDto.assignedUserIds || []);
 
     if (!multiSales && assignedUserIds.length > 1) {
       throw new ForbiddenException("Multi-sales per customer is disabled. Only one sales user can be assigned.");
@@ -118,20 +115,26 @@ export class CustomersService {
   }
 
   async update(id: string, updateCustomerDto: UpdateCustomerDto, factoryId: string, currentUserId: string, currentUserRoles: string[]): Promise<Customer> {
-    const customer = await this.findOne(id, factoryId);
+    const customer = await this.customerModel.findOne({ _id: id, factoryId, isActive: true }).exec();
+    if (!customer) {
+      throw new NotFoundException(`Customer with ID "${id}" not found`);
+    }
 
     if (currentUserRoles.includes("USER") && !currentUserRoles.includes("ADMIN") && customer.platformUserId?.toString() !== currentUserId) {
       throw new ForbiddenException("You can only update your own profile");
     }
 
-    const isSales = currentUserRoles.includes("SALES") && !currentUserRoles.includes("ADMIN");
-    const isOwner = currentUserRoles.includes("OWNER") && !currentUserRoles.includes("ADMIN");
+    const isSales = currentUserRoles.includes(Role.SALES) && !currentUserRoles.includes(Role.ADMIN);
+    const isOwner = currentUserRoles.includes(Role.OWNER) && !currentUserRoles.includes(Role.ADMIN);
 
-    if (isSales && customer.createdBy !== currentUserId && !customer.assignedUserIds?.includes(currentUserId)) {
+    const createdById = customer.createdBy?.toString();
+    const assignedIds = customer.assignedUserIds?.map((uid) => uid.toString()) ?? [];
+
+    if (isSales && createdById !== currentUserId && !assignedIds.includes(currentUserId)) {
       throw new ForbiddenException("You can only update customers assigned to you");
     }
 
-    if (isOwner && customer.createdBy !== currentUserId && !customer.assignedUserIds?.includes(currentUserId)) {
+    if (isOwner && createdById !== currentUserId && !assignedIds.includes(currentUserId)) {
       throw new ForbiddenException("You can only update customers assigned to you");
     }
 
@@ -159,17 +162,19 @@ export class CustomersService {
   async remove(id: string, factoryId: string, currentUserId?: string, currentUserRoles?: string[]): Promise<void> {
     const isSales = currentUserRoles?.includes(Role.SALES) && !currentUserRoles?.includes(Role.ADMIN);
     if (isSales && currentUserId) {
-      const customer = await this.customerModel.findOne({ _id: id, factoryId }).exec();
+      const customer = await this.customerModel.findOne({ _id: id, factoryId, isActive: true }).exec();
       if (!customer) {
         throw new NotFoundException(`Customer with ID "${id}" not found`);
       }
 
-      if (customer.createdBy !== currentUserId && !customer.assignedUserIds?.includes(currentUserId)) {
+      const createdById = customer.createdBy?.toString();
+      const assignedIds = customer.assignedUserIds?.map((uid) => uid.toString()) ?? [];
+      if (createdById !== currentUserId && !assignedIds.includes(currentUserId)) {
         throw new ForbiddenException("You can only delete customers assigned to you");
       }
     }
 
-    const result = await this.customerModel.updateOne({ _id: id, factoryId }, { isActive: false }).exec();
+    const result = await this.customerModel.updateOne({ _id: id, factoryId, isActive: true }, { isActive: false }).exec();
 
     if (result.matchedCount === 0) {
       throw new NotFoundException(`Customer with ID "${id}" not found`);

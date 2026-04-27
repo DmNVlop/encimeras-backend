@@ -6,16 +6,14 @@ export class RedisCheckService implements OnApplicationBootstrap {
   private readonly logger = new Logger("RedisBootstrap");
 
   async onApplicationBootstrap() {
-    // Usamos la misma configuración que en app.module.ts
+    const redisUrl = process.env.REDIS_URL;
     const host = process.env.REDIS_HOST || "localhost";
     const port = parseInt(process.env.REDIS_PORT || "6379");
+    const password = process.env.REDIS_PASSWORD || undefined;
 
-    const redis = new Redis({
-      host,
-      port,
-      // Evitamos que intente reconectar indefinidamente si falla el ping inicial
-      retryStrategy: () => null,
-    });
+    const redis = redisUrl
+      ? new Redis(redisUrl, { retryStrategy: () => null })
+      : new Redis({ host, port, password, retryStrategy: () => null });
 
     try {
       const ping = await redis.ping();
