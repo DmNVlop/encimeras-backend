@@ -32,6 +32,7 @@ El diseño actual es bueno, pero requiere ajustes estructurales y de lógica de 
   * El texto de la etiqueta debe cambiarse de "IMPORTE TOTAL" a "IMPORTE TOTAL PUNTOS".
 
   * Esto evitará confusiones con otras monedas como euros o pesetas.
+  
 
 **US 1.3: Introducción manual de la referencia del presupuesto**
 
