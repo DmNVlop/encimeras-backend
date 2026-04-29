@@ -4,7 +4,7 @@ import { CustomersService } from "./customers.service";
 import { CustomersController } from "./customers.controller";
 import { Customer, CustomerSchema } from "./schemas/customer.schema";
 import { User, UsersSchema } from "../users/schemas/users.schema";
-import { GlobalSettingsModule } from "../settings/global-settings.module";
+import { FactorySettingsModule } from "../factory-settings/factory-settings.module";
 
 @Module({
   imports: [
@@ -12,7 +12,7 @@ import { GlobalSettingsModule } from "../settings/global-settings.module";
       { name: Customer.name, schema: CustomerSchema },
       { name: User.name, schema: UsersSchema },
     ]),
-    GlobalSettingsModule,
+    FactorySettingsModule,
   ],
   controllers: [CustomersController],
   providers: [CustomersService],

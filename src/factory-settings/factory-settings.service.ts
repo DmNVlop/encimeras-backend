@@ -73,4 +73,16 @@ export class FactorySettingsService {
     const settings = await this.findByFactory(factoryId);
     return settings?.logoUrl ?? null;
   }
+
+  async getMultiAssignedUsersPerCustomer(factoryId: string): Promise<boolean> {
+    const settings = await this.factorySettingsModel.findOne({ factoryId }).exec();
+    return settings?.multiAssignedUsersPerCustomer ?? true;
+  }
+
+  async updateMultiAssignedUsersPerCustomer(factoryId: string, value: boolean): Promise<FactorySettings> {
+    const updated = await this.factorySettingsModel
+      .findOneAndUpdate({ factoryId }, { multiAssignedUsersPerCustomer: value }, { new: true, upsert: true })
+      .exec();
+    return updated;
+  }
 }

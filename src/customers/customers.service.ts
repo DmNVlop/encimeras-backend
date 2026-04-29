@@ -6,7 +6,7 @@ import { User } from "../users/schemas/users.schema";
 import { CreateCustomerDto } from "./dto/create-customer.dto";
 import { UpdateCustomerDto } from "./dto/update-customer.dto";
 import { BatchAssignUsersDto } from "./dto/batch-assign-sales.dto";
-import { GlobalSettingsService } from "../settings/global-settings.service";
+import { FactorySettingsService } from "../factory-settings/factory-settings.service";
 import { Role } from "../auth/enums/role.enum";
 
 @Injectable()
@@ -14,11 +14,11 @@ export class CustomersService {
   constructor(
     @InjectModel(Customer.name) private customerModel: Model<CustomerDocument>,
     @InjectModel(User.name) private userModel: Model<User>,
-    private settingsService: GlobalSettingsService,
+    private factorySettingsService: FactorySettingsService,
   ) {}
 
   async create(createCustomerDto: CreateCustomerDto, factoryId: string, userId: string, userRoles?: string[]): Promise<Customer> {
-    const multiSales = await this.settingsService.getMultiSalesPerCustomer();
+    const multiSales = await this.factorySettingsService.getMultiAssignedUsersPerCustomer(factoryId);
 
     const isSales = userRoles?.includes(Role.SALES) && !userRoles?.includes(Role.ADMIN);
 
@@ -183,9 +183,9 @@ export class CustomersService {
     }
 
     if (!isSales && sanitizedDto.assignedUserIds) {
-      const multiSales = await this.settingsService.getMultiSalesPerCustomer();
+      const multiSales = await this.factorySettingsService.getMultiAssignedUsersPerCustomer(factoryId);
       if (!multiSales && sanitizedDto.assignedUserIds.length > 1) {
-        throw new ForbiddenException("Multi-sales per customer is disabled. Only one sales user can be assigned.");
+        throw new ForbiddenException("Multi-user assignment per customer is disabled. Only one user can be assigned.");
       }
     }
 
@@ -230,17 +230,20 @@ export class CustomersService {
   }
 
   async batchAssignSales(dto: BatchAssignUsersDto, factoryId: string): Promise<{ updatedCount: number }> {
-    const salesUsers = await this.userModel.find({ _id: { $in: dto.assignedUserIds }, roles: Role.SALES }).exec();
+    // Acepta usuarios con rol SALES o MANAGER
+    const assignableUsers = await this.userModel
+      .find({ _id: { $in: dto.assignedUserIds }, roles: { $in: [Role.SALES, Role.MANAGER] } })
+      .exec();
 
-    if (salesUsers.length !== dto.assignedUserIds.length) {
-      const foundIds = salesUsers.map((u) => (u._id as unknown as string).toString());
+    if (assignableUsers.length !== dto.assignedUserIds.length) {
+      const foundIds = assignableUsers.map((u) => (u._id as unknown as string).toString());
       const missing = dto.assignedUserIds.filter((id) => !foundIds.includes(id));
-      throw new NotFoundException(`Sales users not found or do not have SALES role: ${missing.join(", ")}`);
+      throw new NotFoundException(`Users not found or do not have SALES/MANAGER role: ${missing.join(", ")}`);
     }
 
-    const multiSales = await this.settingsService.getMultiSalesPerCustomer();
-    if (!multiSales && dto.assignedUserIds.length > 1) {
-      throw new ForbiddenException("Multi-sales per customer is disabled. Only one sales user can be assigned.");
+    const multiAssigned = await this.factorySettingsService.getMultiAssignedUsersPerCustomer(factoryId);
+    if (!multiAssigned && dto.assignedUserIds.length > 1) {
+      throw new ForbiddenException("Multi-user assignment per customer is disabled. Only one user can be assigned.");
     }
 
     const result = await this.customerModel
