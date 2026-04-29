@@ -58,7 +58,7 @@ export class CustomersService {
 
   async findAllForManager(factoryId: string, managerId: string): Promise<Customer[]> {
     const salesIds = await this.userModel
-      .find({ createdBy: managerId, roles: "SALES" })
+      .find({ managerId: managerId, roles: "SALES" })
       .select("_id")
       .lean()
       .exec();
@@ -75,7 +75,7 @@ export class CustomersService {
 
   async findOneForManager(id: string, factoryId: string, managerId: string): Promise<Customer> {
     const salesIds = await this.userModel
-      .find({ createdBy: managerId, roles: "SALES" })
+      .find({ managerId: managerId, roles: "SALES" })
       .select("_id")
       .lean()
       .exec();

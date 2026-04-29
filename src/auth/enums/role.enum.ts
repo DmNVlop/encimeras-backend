@@ -1,10 +1,10 @@
 export enum Role {
   ADMIN = "ADMIN",
-  OWNER = "OWNER",     // Propietario de fábrica
+  OWNER = "OWNER", // Propietario de fábrica
   MANAGER = "MANAGER", // Gerente de fábrica (por debajo de OWNER)
-  SALES = "SALES",     // Comercial
-  WORKER = "WORKER",   // Operario de fábrica
-  USER = "USER",       // Cliente final
+  SALES = "SALES", // Comercial
+  WORKER = "WORKER", // Operario de fábrica
+  USER = "USER", // Cliente final
 }
 
 /**
@@ -13,12 +13,12 @@ export enum Role {
  * que requieran un rol de nivel menor o igual.
  */
 export const ROLE_HIERARCHY: Record<Role, number> = {
-  [Role.ADMIN]:   5,
-  [Role.OWNER]:   4,
+  [Role.ADMIN]: 5,
+  [Role.OWNER]: 4,
   [Role.MANAGER]: 3,
-  [Role.SALES]:   2,
-  [Role.WORKER]:  1,
-  [Role.USER]:    0,
+  [Role.SALES]: 2,
+  [Role.WORKER]: 1,
+  [Role.USER]: 0,
 };
 
 /** Devuelve el nivel jerárquico máximo de un array de roles. */

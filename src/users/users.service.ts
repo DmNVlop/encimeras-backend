@@ -5,7 +5,7 @@ import * as bcrypt from "bcrypt";
 import { User } from "./schemas/users.schema";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
-import { Role } from "../auth/enums/role.enum";
+import { Role, ROLE_HIERARCHY, getMaxRoleLevel } from "../auth/enums/role.enum";
 import { RoleHierarchyService } from "../auth/services/role-hierarchy.service";
 
 @Injectable()
@@ -104,8 +104,17 @@ export class UsersService {
     return this.userModel.find(query).select("-password").exec();
   }
 
-  async findAllByFactory(factoryId: string): Promise<User[]> {
-    return this.userModel.find({ factoryId }).select("-password").exec();
+  async findAllByFactory(factoryId: string, callerRoles: Role[]): Promise<User[]> {
+    if (!callerRoles || callerRoles.length === 0) return [];
+
+    const callerLevel = getMaxRoleLevel(callerRoles);
+    const visibleRoles = Object.entries(ROLE_HIERARCHY)
+      .filter(([, level]) => level < callerLevel)
+      .map(([role]) => role as Role);
+
+    if (visibleRoles.length === 0) return [];
+
+    return this.userModel.find({ factoryId, roles: { $in: visibleRoles } }).select("-password").exec();
   }
 
   async findOne(id: string): Promise<User> {

@@ -34,24 +34,52 @@ export class UsersController {
   }
 
   @Get()
-  @Roles(Role.MANAGER) // ADMIN, OWNER y MANAGER pueden listar
-  @ApiOperation({ summary: "Listar usuarios. OWNER/MANAGER ven su fábrica, ADMIN ve todos. ?role=SALES para filtrar, ?managed=true para OWNER" })
+  @Roles(Role.USER) // Todos los roles autenticados pueden listar (el scope se filtra por rol)
+  @ApiOperation({ summary: "Listar usuarios según rol. ADMIN=todos, OWNER=fábrica, MANAGER=sus SALES, SALES/WORKER/USER=solo su perfil" })
   @ApiResponse({ status: 200, description: "Lista de usuarios." })
-  findAll(@Query("role") role?: string, @Query("managed") managed?: string, @GetUser() user?: any) {
+  async findAll(@Query("role") role?: string, @Query("managed") managed?: string, @GetUser() user?: any) {
     const userRoles: Role[] = user?.roles ?? [];
 
     if (this.roleHierarchy.hasExactRole(userRoles, Role.OWNER) && user?.factoryId) {
       if (managed === "true") {
         return this.usersService.findManagedUsers(user.userId);
       }
-      return this.usersService.findAllByFactory(user.factoryId);
+      return this.usersService.findAllByFactory(user.factoryId, userRoles);
     }
 
     if (this.roleHierarchy.hasExactRole(userRoles, Role.MANAGER)) {
       return this.usersService.findManagedByManager(user.userId);
     }
 
+    // SALES, WORKER, USER: solo su propio perfil
+    if (!this.roleHierarchy.isAtLeast(userRoles, Role.MANAGER)) {
+      const ownProfile = await this.usersService.findOne(user.userId);
+      return [ownProfile];
+    }
+
     return this.usersService.findAll(role);
+  }
+
+  @Get("managed")
+  @Roles(Role.MANAGER) // OWNER y MANAGER pueden ver usuarios gestionados
+  @ApiOperation({ summary: "Usuarios gestionados por el OWNER o MANAGER autenticado" })
+  @ApiResponse({ status: 200, description: "Lista de usuarios gestionados." })
+  findManaged(@GetUser() user: any) {
+    const userRoles: Role[] = user.roles ?? [];
+    if (this.roleHierarchy.hasExactRole(userRoles, Role.OWNER)) {
+      return this.usersService.findManagedUsers(user.userId);
+    }
+    return this.usersService.findManagedByManager(user.userId);
+  }
+
+  @Get("managers")
+  @Roles(Role.MANAGER)
+  @ApiOperation({ summary: "Lista de usuarios MANAGER disponibles en la fábrica" })
+  @ApiResponse({ status: 200, description: "Lista de MANAGERs." })
+  getManagers(@GetUser() user: any) {
+    const userRoles: Role[] = user?.roles ?? [];
+    const factoryId = this.roleHierarchy.isAtLeast(userRoles, Role.ADMIN) ? undefined : user.factoryId;
+    return this.usersService.findManagerUsers(factoryId);
   }
 
   @Get(":id")
@@ -115,18 +143,6 @@ export class UsersController {
     return this.usersService.remove(id);
   }
 
-  @Get("managed")
-  @Roles(Role.MANAGER) // OWNER y MANAGER pueden ver usuarios gestionados
-  @ApiOperation({ summary: "Usuarios gestionados por el OWNER o MANAGER autenticado" })
-  @ApiResponse({ status: 200, description: "Lista de usuarios gestionados." })
-  findManaged(@GetUser() user: any) {
-    const userRoles: Role[] = user.roles ?? [];
-    if (this.roleHierarchy.hasExactRole(userRoles, Role.OWNER)) {
-      return this.usersService.findManagedUsers(user.userId);
-    }
-    return this.usersService.findManagedByManager(user.userId);
-  }
-
   @Post(":id/transfer-owner")
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: "Transferir SALES o MANAGER a otro OWNER (solo ADMIN)" })
@@ -144,16 +160,6 @@ export class UsersController {
   @ApiResponse({ status: 403, description: "Sin permisos." })
   batchTransferOwnership(@Body() batchTransferDto: BatchTransferDto, @GetUser() user: any) {
     return this.usersService.batchTransferOwnership(batchTransferDto.userIds, batchTransferDto.newOwnerId, user.roles, user.userId);
-  }
-
-  @Get("managers")
-  @Roles(Role.MANAGER)
-  @ApiOperation({ summary: "Lista de usuarios MANAGER disponibles en la fábrica" })
-  @ApiResponse({ status: 200, description: "Lista de MANAGERs." })
-  getManagers(@GetUser() user: any) {
-    const userRoles: Role[] = user?.roles ?? [];
-    const factoryId = this.roleHierarchy.isAtLeast(userRoles, Role.ADMIN) ? undefined : user.factoryId;
-    return this.usersService.findManagerUsers(factoryId);
   }
 
   @Post(":id/transfer-manager")
