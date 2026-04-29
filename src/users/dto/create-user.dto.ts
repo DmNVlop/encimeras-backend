@@ -64,10 +64,18 @@ export class CreateUserDto {
   phone?: string;
 
   @ApiPropertyOptional({
-    description: "ID del usuario OWNER que gestiona este usuario (requerido para SALES cuando lo crea ADMIN)",
+    description: "ID del usuario OWNER que gestiona este usuario",
     example: "507f1f77bcf86cd799439011",
   })
   @IsMongoId()
   @IsOptional()
   ownerId?: string;
+
+  @ApiPropertyOptional({
+    description: "ID del usuario MANAGER asignado a este SALES (requerido para SALES cuando lo crea ADMIN u OWNER)",
+    example: "507f1f77bcf86cd799439011",
+  })
+  @IsMongoId()
+  @IsOptional()
+  managerId?: string;
 }

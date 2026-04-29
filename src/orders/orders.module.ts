@@ -8,6 +8,7 @@ import { EventsModule } from "src/events/events.module";
 import { BullModule } from "@nestjs/bullmq";
 import { CartProcessor } from "./processors/cart.processor";
 import { CartModule } from "../cart/cart.module";
+import { UsersModule } from "../users/users.module";
 import { forwardRef } from "@nestjs/common";
 
 @Module({
@@ -15,6 +16,7 @@ import { forwardRef } from "@nestjs/common";
     DraftsModule,
     EventsModule,
     forwardRef(() => CartModule),
+    UsersModule,
     MongooseModule.forFeature([{ name: Order.name, schema: OrderSchema }]),
     BullModule.registerQueue({
       name: "cart",

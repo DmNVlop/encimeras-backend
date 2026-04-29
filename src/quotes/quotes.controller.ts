@@ -1,5 +1,5 @@
 // src/quotes/quotes.controller.ts
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, UsePipes, ValidationPipe } from "@nestjs/common";
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, UsePipes, ValidationPipe, Req } from "@nestjs/common";
 import { CreateQuoteDto } from "./dto/create-quote.dto";
 import { CalculateQuoteDto } from "./dto/quote.dto";
 import { AddPieceDto } from "./dto/add-piece.dto";
@@ -29,8 +29,9 @@ export class QuotesController {
   @Post()
   @ApiOperation({ summary: "Create and save a new quote" })
   @UsePipes(ValidationPipe)
-  create(@Body() createQuoteDto: CreateQuoteDto) {
-    return this.quotesService.create(createQuoteDto);
+  create(@Body() createQuoteDto: CreateQuoteDto, @Req() req: any) {
+    const createdBy = req?.user?.userId;
+    return this.quotesService.create(createQuoteDto, createdBy);
   }
 
   @ApiBearerAuth()
@@ -44,8 +45,8 @@ export class QuotesController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
-  @Roles(Role.ADMIN, Role.SALES)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.SALES)
   @Delete(":id/pieces/:pieceId")
   @ApiOperation({ summary: "Remove a piece from an existing quote" })
   removePiece(@Param("id") id: string, @Param("pieceId") pieceId: string) {
@@ -54,26 +55,36 @@ export class QuotesController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.OWNER, Role.SALES)
+  @Roles(Role.SALES) // nivel 2 mínimo → MANAGER, OWNER y ADMIN también acceden
   @Get()
-  @ApiOperation({ summary: "Get all quotes (Admin, Owner & Sales)" })
+  @ApiOperation({ summary: "Get all quotes (Admin, Owner, Manager & Sales)" })
   findAll(@GetUser() user: any) {
-    const factoryId = user?.factoryId;
-    if (user?.roles.includes(Role.OWNER) && factoryId) {
-      return this.quotesService.findAllByFactory(factoryId);
+    if (user?.roles.includes(Role.ADMIN)) {
+      return this.quotesService.findAll();
+    }
+    if (user?.roles.includes(Role.OWNER) && user?.factoryId) {
+      return this.quotesService.findAllByFactory(user.factoryId);
+    }
+    if (user?.roles.includes(Role.MANAGER)) {
+      return this.quotesService.findAllByManager(user.userId);
     }
     return this.quotesService.findAll();
   }
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.OWNER, Role.SALES)
+  @Roles(Role.SALES) // nivel 2 mínimo
   @Get(":id")
-  @ApiOperation({ summary: "Get a single quote by ID (Admin, Owner & Sales)" })
+  @ApiOperation({ summary: "Get a single quote by ID (Admin, Owner, Manager & Sales)" })
   findOne(@Param("id") id: string, @GetUser() user: any) {
-    const factoryId = user?.factoryId;
-    if (user?.roles.includes(Role.OWNER) && factoryId) {
-      return this.quotesService.findOneByFactory(id, factoryId);
+    if (user?.roles.includes(Role.ADMIN)) {
+      return this.quotesService.findOne(id);
+    }
+    if (user?.roles.includes(Role.OWNER) && user?.factoryId) {
+      return this.quotesService.findOneByFactory(id, user.factoryId);
+    }
+    if (user?.roles.includes(Role.MANAGER)) {
+      return this.quotesService.findOneByManager(id, user.userId);
     }
     return this.quotesService.findOne(id);
   }

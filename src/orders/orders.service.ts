@@ -6,6 +6,7 @@ import { CreateOrderDto } from "./dto/create-order.dto";
 import { DraftsService } from "../drafts/drafts.service";
 import { EventsGateway } from "../events/events.gateway";
 import { CartService } from "../cart/cart.service";
+import { UsersService } from "../users/users.service";
 
 @Injectable()
 export class OrdersService {
@@ -14,6 +15,7 @@ export class OrdersService {
     private draftsService: DraftsService,
     private eventsGateway: EventsGateway,
     private cartService: CartService,
+    private usersService: UsersService,
   ) {}
 
   /**
@@ -83,6 +85,30 @@ export class OrdersService {
     const orders = await this.orderModel.find(query).select("header").sort({ "header.orderDate": -1 }).lean();
 
     return orders;
+  }
+
+  async findAllByManager(managerId: string, status?: string): Promise<any[]> {
+    const salesUsers = await this.usersService.findManagedByManager(managerId);
+    const salesIds = salesUsers.map((u) => (u as any)._id.toString());
+    const ownerIds = [managerId, ...salesIds];
+
+    const query: any = { "header.userId": { $in: ownerIds } };
+    if (status) query["header.status"] = status;
+
+    return this.orderModel.find(query).select("header").sort({ "header.orderDate": -1 }).lean();
+  }
+
+  async findOneByManager(id: string, managerId: string): Promise<Order> {
+    const salesUsers = await this.usersService.findManagedByManager(managerId);
+    const salesIds = salesUsers.map((u) => (u as any)._id.toString());
+    const ownerIds = [managerId, ...salesIds];
+
+    const order = await this.orderModel.findOne({ _id: id, "header.userId": { $in: ownerIds } }).lean();
+
+    if (!order) {
+      throw new NotFoundException(`La orden con ID ${id} no existe o no tienes permiso para verla.`);
+    }
+    return order as unknown as Order;
   }
 
   /**

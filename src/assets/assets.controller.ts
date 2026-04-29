@@ -14,9 +14,9 @@ export class AssetsController {
   constructor(private readonly assetsService: AssetsService) {}
 
   @Post("upload")
-  @Roles(Role.ADMIN, Role.OWNER, Role.SALES)
+  @Roles(Role.SALES) // nivel 2 mínimo → MANAGER, OWNER y ADMIN también
   @ApiBearerAuth()
-  @ApiOperation({ summary: "Subir un archivo de imagen (Admin & Sales)" })
+  @ApiOperation({ summary: "Subir un archivo de imagen (Admin, Owner, Manager & Sales)" })
   @UseInterceptors(FileInterceptor("file"))
   async uploadFile(
     @UploadedFile(

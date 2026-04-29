@@ -10,6 +10,7 @@ import { MeasurementRuleSetsModule } from "src/measurement-rule-sets/measurement
 import { MainPiecesModule } from "src/main-pieces/main-pieces.module";
 import { DiscountRulesModule } from "src/discount-rules/discount-rules.module";
 import { CustomersModule } from "src/customers/customers.module";
+import { UsersModule } from "src/users/users.module";
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { CustomersModule } from "src/customers/customers.module";
     MainPiecesModule,
     DiscountRulesModule,
     CustomersModule,
+    UsersModule,
     MongooseModule.forFeature([{ name: Quote.name, schema: QuoteSchema }]),
   ],
   controllers: [QuotesController],

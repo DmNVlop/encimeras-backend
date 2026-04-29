@@ -14,7 +14,7 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
-  @Roles(Role.USER, Role.SALES, Role.ADMIN)
+  @Roles(Role.USER) // nivel 0 mínimo → todos los roles autenticados
   async convertToOrder(@Body() createOrderDto: CreateOrderDto, @Request() req) {
     const userId = req.user.userId;
 
@@ -27,33 +27,47 @@ export class OrdersController {
   }
 
   @Get()
-  @Roles(Role.ADMIN, Role.OWNER, Role.SALES, Role.USER)
+  @Roles(Role.USER) // nivel 0 mínimo — la lógica interna filtra por rol
   async listAll(@Query("status") status?: string, @Request() req?: any) {
     const user = req.user;
 
+    if (user.roles.includes(Role.ADMIN)) {
+      return this.ordersService.findAllHeaders(status);
+    }
     if (user.roles.includes(Role.OWNER) && user.factoryId) {
       return this.ordersService.findAllByFactory(user.factoryId, status);
     }
-
-    const ownerId = user.roles.includes(Role.ADMIN) || user.roles.includes(Role.SALES) ? undefined : user.userId;
-    return this.ordersService.findAllHeaders(status, ownerId);
+    if (user.roles.includes(Role.MANAGER)) {
+      return this.ordersService.findAllByManager(user.userId, status);
+    }
+    if (user.roles.includes(Role.SALES)) {
+      return this.ordersService.findAllHeaders(status, undefined);
+    }
+    return this.ordersService.findAllHeaders(status, user.userId);
   }
 
   @Get(":id")
-  @Roles(Role.ADMIN, Role.OWNER, Role.SALES, Role.USER)
+  @Roles(Role.USER) // nivel 0 mínimo
   async getDetail(@Param("id") id: string, @Request() req?: any) {
     const user = req.user;
 
+    if (user.roles.includes(Role.ADMIN)) {
+      return this.ordersService.findOne(id);
+    }
     if (user.roles.includes(Role.OWNER) && user.factoryId) {
       return this.ordersService.findOneByFactory(id, user.factoryId);
     }
-
-    const ownerId = user.roles.includes(Role.ADMIN) || user.roles.includes(Role.SALES) ? undefined : user.userId;
-    return this.ordersService.findOne(id, ownerId);
+    if (user.roles.includes(Role.MANAGER)) {
+      return this.ordersService.findOneByManager(id, user.userId);
+    }
+    if (user.roles.includes(Role.SALES)) {
+      return this.ordersService.findOne(id);
+    }
+    return this.ordersService.findOne(id, user.userId);
   }
 
   @Patch(":id/status")
-  @Roles(Role.ADMIN, Role.SALES, Role.WORKER)
+  @Roles(Role.WORKER) // nivel 1 mínimo → WORKER, SALES, MANAGER, OWNER, ADMIN
   async updateStatus(@Param("id") id: string, @Body() updateOrderStatusDto: UpdateOrderStatusDto) {
     return this.ordersService.updateStatus(id, updateOrderStatusDto.status);
   }

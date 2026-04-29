@@ -26,7 +26,7 @@ export class FactorySettingsController {
   constructor(private readonly factorySettingsService: FactorySettingsService) {}
 
   @Get()
-  @Roles(Role.ADMIN, Role.OWNER, Role.SALES)
+  @Roles(Role.SALES) // nivel 2 mínimo → MANAGER, OWNER y ADMIN también
   @ApiOperation({ summary: "Obtener configuración de la fábrica actual" })
   findByFactory(@GetUser("factoryId") factoryId: string) {
     const fid = factoryId || "000000000000000000000000";
