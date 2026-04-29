@@ -14,6 +14,11 @@ export class FactorySettings {
   // Filename guardado para poder borrar el archivo anterior sin dejar huérfanos
   @Prop({ type: String, default: null })
   logoFilename: string | null;
+
+  // true = varios usuarios (SALES o MANAGER) por cliente, false = solo uno
+  @Prop({ type: Boolean, default: true })
+  multiAssignedUsersPerCustomer: boolean;
 }
+
 
 export const FactorySettingsSchema = SchemaFactory.createForClass(FactorySettings);

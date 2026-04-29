@@ -3,15 +3,19 @@ import {
   Get,
   Patch,
   Delete,
+  Body,
   UseGuards,
   UseInterceptors,
   UploadedFile,
   ParseFilePipe,
   MaxFileSizeValidator,
+  UsePipes,
+  ValidationPipe,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { FactorySettingsService } from "./factory-settings.service";
+import { UpdateAssignmentModeDto } from "./dto/update-factory-settings.dto";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -57,5 +61,14 @@ export class FactorySettingsController {
   deleteLogo(@GetUser("factoryId") factoryId: string) {
     const fid = factoryId || "000000000000000000000000";
     return this.factorySettingsService.deleteLogo(fid);
+  }
+
+  @Patch("assignment-mode")
+  @Roles(Role.ADMIN)
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  @ApiOperation({ summary: "Configurar modo de asignación de usuarios por cliente (solo ADMIN)" })
+  updateAssignmentMode(@GetUser("factoryId") factoryId: string, @Body() dto: UpdateAssignmentModeDto) {
+    const fid = factoryId || "000000000000000000000000";
+    return this.factorySettingsService.updateMultiAssignedUsersPerCustomer(fid, dto.multiAssignedUsersPerCustomer);
   }
 }

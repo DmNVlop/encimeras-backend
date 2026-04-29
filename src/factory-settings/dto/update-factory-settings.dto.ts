@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from "class-validator";
+import { IsOptional, IsString, IsBoolean } from "class-validator";
 import { ApiPropertyOptional } from "@nestjs/swagger";
 
 export class UpdateFactorySettingsDto {
@@ -11,4 +11,10 @@ export class UpdateFactorySettingsDto {
   @IsOptional()
   @IsString()
   logoFilename?: string | null;
+}
+
+export class UpdateAssignmentModeDto {
+  @ApiPropertyOptional({ description: "true = varios usuarios asignados por cliente, false = solo uno" })
+  @IsBoolean()
+  multiAssignedUsersPerCustomer: boolean;
 }
