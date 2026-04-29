@@ -31,13 +31,19 @@ export class OrdersController {
   async listAll(@Query("status") status?: string, @Request() req?: any) {
     const user = req.user;
 
-    if ((user.roles.includes(Role.OWNER) || user.roles.includes(Role.MANAGER)) && user.factoryId) {
+    if (user.roles.includes(Role.ADMIN)) {
+      return this.ordersService.findAllHeaders(status);
+    }
+    if (user.roles.includes(Role.OWNER) && user.factoryId) {
       return this.ordersService.findAllByFactory(user.factoryId, status);
     }
-
-    const isBroadAccess = user.roles.includes(Role.ADMIN) || user.roles.includes(Role.SALES) || user.roles.includes(Role.MANAGER);
-    const ownerId = isBroadAccess ? undefined : user.userId;
-    return this.ordersService.findAllHeaders(status, ownerId);
+    if (user.roles.includes(Role.MANAGER)) {
+      return this.ordersService.findAllByManager(user.userId, status);
+    }
+    if (user.roles.includes(Role.SALES)) {
+      return this.ordersService.findAllHeaders(status, undefined);
+    }
+    return this.ordersService.findAllHeaders(status, user.userId);
   }
 
   @Get(":id")
@@ -45,13 +51,19 @@ export class OrdersController {
   async getDetail(@Param("id") id: string, @Request() req?: any) {
     const user = req.user;
 
-    if ((user.roles.includes(Role.OWNER) || user.roles.includes(Role.MANAGER)) && user.factoryId) {
+    if (user.roles.includes(Role.ADMIN)) {
+      return this.ordersService.findOne(id);
+    }
+    if (user.roles.includes(Role.OWNER) && user.factoryId) {
       return this.ordersService.findOneByFactory(id, user.factoryId);
     }
-
-    const isBroadAccess = user.roles.includes(Role.ADMIN) || user.roles.includes(Role.SALES) || user.roles.includes(Role.MANAGER);
-    const ownerId = isBroadAccess ? undefined : user.userId;
-    return this.ordersService.findOne(id, ownerId);
+    if (user.roles.includes(Role.MANAGER)) {
+      return this.ordersService.findOneByManager(id, user.userId);
+    }
+    if (user.roles.includes(Role.SALES)) {
+      return this.ordersService.findOne(id);
+    }
+    return this.ordersService.findOne(id, user.userId);
   }
 
   @Patch(":id/status")

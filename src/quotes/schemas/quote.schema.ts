@@ -33,6 +33,9 @@ export class Quote {
   @Prop({ default: 0 })
   totalDiscount: number;
 
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: "User" })
+  createdBy?: string;
+
   @Prop({ type: Array, default: [] })
   appliedRules: Array<{ ruleId: string; ruleName: string; discountAmount: number }>;
 

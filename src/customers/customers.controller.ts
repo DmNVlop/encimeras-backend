@@ -37,8 +37,11 @@ export class CustomersController {
     if (roles.includes(Role.ADMIN)) {
       return this.customersService.findAll(factoryId);
     }
-    if (roles.includes(Role.OWNER) || roles.includes(Role.MANAGER)) {
+    if (roles.includes(Role.OWNER)) {
       return this.customersService.findAllForOwner(factoryId);
+    }
+    if (roles.includes(Role.MANAGER)) {
+      return this.customersService.findAllForManager(factoryId, userId);
     }
     if (roles.includes(Role.WORKER)) {
       return this.customersService.findAll(factoryId);
@@ -59,8 +62,11 @@ export class CustomersController {
     if (roles.includes(Role.ADMIN)) {
       return this.customersService.findOne(id, factoryId);
     }
-    if (roles.includes(Role.OWNER) || roles.includes(Role.MANAGER)) {
+    if (roles.includes(Role.OWNER)) {
       return this.customersService.findOneForOwner(id, factoryId);
+    }
+    if (roles.includes(Role.MANAGER)) {
+      return this.customersService.findOneForManager(id, factoryId, userId);
     }
     if (roles.includes(Role.WORKER)) {
       return this.customersService.findOne(id, factoryId);

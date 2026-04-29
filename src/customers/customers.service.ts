@@ -56,6 +56,45 @@ export class CustomersService {
       .exec();
   }
 
+  async findAllForManager(factoryId: string, managerId: string): Promise<Customer[]> {
+    const salesIds = await this.userModel
+      .find({ createdBy: managerId, roles: "SALES" })
+      .select("_id")
+      .lean()
+      .exec();
+    const salesIdList = salesIds.map((u) => u._id.toString());
+
+    return this.customerModel
+      .find({
+        factoryId,
+        isActive: true,
+        $or: [{ createdBy: managerId }, { createdBy: { $in: salesIdList } }, { assignedUserIds: managerId }, { assignedUserIds: { $in: salesIdList } }],
+      })
+      .exec();
+  }
+
+  async findOneForManager(id: string, factoryId: string, managerId: string): Promise<Customer> {
+    const salesIds = await this.userModel
+      .find({ createdBy: managerId, roles: "SALES" })
+      .select("_id")
+      .lean()
+      .exec();
+    const salesIdList = salesIds.map((u) => u._id.toString());
+
+    const customer = await this.customerModel
+      .findOne({
+        _id: id,
+        factoryId,
+        isActive: true,
+        $or: [{ createdBy: managerId }, { createdBy: { $in: salesIdList } }, { assignedUserIds: managerId }, { assignedUserIds: { $in: salesIdList } }],
+      })
+      .exec();
+    if (!customer) {
+      throw new NotFoundException(`Customer with ID "${id}" not found or access denied`);
+    }
+    return customer;
+  }
+
   async findAllForUser(factoryId: string, userId: string): Promise<Customer[]> {
     return this.customerModel
       .find({

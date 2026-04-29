@@ -17,6 +17,7 @@ import { MainPiece } from "src/main-pieces/schemas/main-pieces.schema";
 import { Addon } from "src/addons/schemas/addons.schema";
 import { DiscountEngineService } from "src/discount-rules/discount-engine.service";
 import { CustomersService } from "src/customers/customers.service";
+import { UsersService } from "src/users/users.service";
 
 // Tipos Helper
 type MainPieceData = CalculateQuoteDto["mainPieces"][0];
@@ -33,6 +34,7 @@ export class QuotesService {
     private readonly mainPiecesService: MainPiecesService,
     private readonly discountEngineService: DiscountEngineService,
     private readonly customersService: CustomersService,
+    private readonly usersService: UsersService,
   ) {}
 
   // ===========================================================================
@@ -146,7 +148,7 @@ export class QuotesService {
   // ===========================================================================
   // 2. MÉTODO CREATE
   // ===========================================================================
-  async create(createQuoteDto: CreateQuoteDto): Promise<Quote> {
+  async create(createQuoteDto: CreateQuoteDto, createdBy?: string): Promise<Quote> {
     // 1. Recalculamos para asegurar que el precio es real (no confiamos en el frontend)
     const calculation = await this.calculate(createQuoteDto);
 
@@ -169,13 +171,14 @@ export class QuotesService {
       customerName: createQuoteDto.customerName,
       customerEmail: createQuoteDto.customerEmail,
       customerPhone: createQuoteDto.customerPhone,
-      mainPieces: createdPieceIds, // Referencias
+      mainPieces: createdPieceIds,
       totalPrice: calculation.finalTotalPoints,
       totalPriceBeforeDiscount: calculation.totalPoints,
       totalDiscount: calculation.totalDiscount,
       appliedRules: calculation.appliedRules,
       priceBreakdown: flatBreakdown,
       status: "Pendiente",
+      ...(createdBy ? { createdBy } : {}),
     });
 
     return newQuote.save();
@@ -208,6 +211,32 @@ export class QuotesService {
     const quote = await this.findOne(id);
     if (!quote) {
       throw new NotFoundException(`Quote with ID "${id}" not found`);
+    }
+    return quote;
+  }
+
+  async findAllByManager(managerId: string): Promise<Quote[]> {
+    const salesUsers = await this.usersService.findManagedByManager(managerId);
+    const salesIds = salesUsers.map((u) => (u as any)._id.toString());
+    const creatorIds = [managerId, ...salesIds];
+
+    return this.quoteModel
+      .find({ createdBy: { $in: creatorIds } })
+      .populate({ path: "mainPieces", populate: { path: "materialId" } })
+      .exec();
+  }
+
+  async findOneByManager(id: string, managerId: string): Promise<Quote> {
+    const salesUsers = await this.usersService.findManagedByManager(managerId);
+    const salesIds = salesUsers.map((u) => (u as any)._id.toString());
+    const creatorIds = [managerId, ...salesIds];
+
+    const quote = await this.quoteModel
+      .findOne({ _id: id, createdBy: { $in: creatorIds } })
+      .populate({ path: "mainPieces", populate: { path: "materialId" } })
+      .exec();
+    if (!quote) {
+      throw new NotFoundException(`Quote with ID "${id}" not found or access denied`);
     }
     return quote;
   }

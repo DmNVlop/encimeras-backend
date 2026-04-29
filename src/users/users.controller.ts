@@ -45,11 +45,8 @@ export class UsersController {
       return this.usersService.findAllByFactory(user.factoryId);
     }
 
-    if (this.roleHierarchy.hasExactRole(userRoles, Role.MANAGER) && user?.factoryId) {
-      if (managed === "true") {
-        return this.usersService.findManagedByManager(user.userId);
-      }
-      return this.usersService.findAllByFactory(user.factoryId);
+    if (this.roleHierarchy.hasExactRole(userRoles, Role.MANAGER)) {
+      return this.usersService.findManagedByManager(user.userId);
     }
 
     return this.usersService.findAll(role);
@@ -61,11 +58,25 @@ export class UsersController {
   @ApiResponse({ status: 200, description: "Usuario encontrado." })
   @ApiResponse({ status: 403, description: "Sin permisos." })
   @ApiResponse({ status: 404, description: "No encontrado." })
-  findOne(@Param("id") id: string, @Req() req: any) {
+  async findOne(@Param("id") id: string, @Req() req: any) {
     const user = req.user;
     const userRoles: Role[] = user.roles ?? [];
-    const canSeeAny = this.roleHierarchy.isAtLeast(userRoles, Role.MANAGER);
-    if (!canSeeAny && user.userId !== id) {
+
+    if (this.roleHierarchy.isAtLeast(userRoles, Role.OWNER)) {
+      return this.usersService.findOne(id);
+    }
+
+    if (this.roleHierarchy.hasExactRole(userRoles, Role.MANAGER)) {
+      const managed = await this.usersService.findManagedByManager(user.userId);
+      const isSelf = user.userId === id;
+      const isChild = managed.some((u) => (u as any)._id.toString() === id);
+      if (!isSelf && !isChild) {
+        throw new ForbiddenException("No tienes permiso para ver este perfil");
+      }
+      return this.usersService.findOne(id);
+    }
+
+    if (user.userId !== id) {
       throw new ForbiddenException("No tienes permiso para ver este perfil");
     }
     return this.usersService.findOne(id);
