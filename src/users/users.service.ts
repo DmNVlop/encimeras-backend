@@ -36,12 +36,42 @@ export class UsersService {
       }
     }
 
-    // Resolución de ownerId para usuarios SALES
+    // Resolución de ownerId y managerId para usuarios SALES
     let finalOwnerId = ownerId;
-    if (roles.includes(Role.SALES) || roles.includes(Role.MANAGER)) {
+    let finalManagerId = createUserDto.managerId;
+
+    if (roles.includes(Role.SALES)) {
+      if (currentUserRoles.includes(Role.ADMIN)) {
+        // ADMIN debe especificar managerId
+        if (!finalManagerId) {
+          throw new ForbiddenException("ADMIN debe especificar managerId al crear usuario SALES");
+        }
+        const managerUser = await this.userModel.findById(finalManagerId).exec();
+        if (!managerUser || !managerUser.roles.includes(Role.MANAGER)) {
+          throw new NotFoundException(`Manager con ID ${finalManagerId} no encontrado o no es MANAGER`);
+        }
+        // Hereda el ownerId del MANAGER
+        finalOwnerId = managerUser.ownerId ?? ownerId;
+      } else if (currentUserRoles.includes(Role.OWNER)) {
+        // OWNER debe especificar managerId
+        if (!finalManagerId) {
+          throw new ForbiddenException("OWNER debe especificar managerId al crear usuario SALES");
+        }
+        const managerUser = await this.userModel.findById(finalManagerId).exec();
+        if (!managerUser || !managerUser.roles.includes(Role.MANAGER)) {
+          throw new NotFoundException(`Manager con ID ${finalManagerId} no encontrado o no es MANAGER`);
+        }
+        finalOwnerId = currentUserId;
+      } else if (currentUserRoles.includes(Role.MANAGER)) {
+        // MANAGER creando SALES: se auto-asigna como manager
+        const managerUser = await this.userModel.findById(currentUserId).exec();
+        finalManagerId = currentUserId;
+        finalOwnerId = managerUser?.ownerId ?? undefined;
+      }
+    } else if (roles.includes(Role.MANAGER)) {
       if (currentUserRoles.includes(Role.ADMIN)) {
         if (!ownerId) {
-          throw new ForbiddenException("ADMIN debe especificar ownerId al crear usuario SALES o MANAGER");
+          throw new ForbiddenException("ADMIN debe especificar ownerId al crear usuario MANAGER");
         }
         const ownerUser = await this.userModel.findById(ownerId).exec();
         if (!ownerUser || !ownerUser.roles.includes(Role.OWNER)) {
@@ -50,11 +80,6 @@ export class UsersService {
         finalOwnerId = ownerId;
       } else if (currentUserRoles.includes(Role.OWNER)) {
         finalOwnerId = currentUserId;
-      }
-      // MANAGER creando SALES: hereda el ownerId del MANAGER
-      else if (currentUserRoles.includes(Role.MANAGER)) {
-        const managerUser = await this.userModel.findById(currentUserId).exec();
-        finalOwnerId = managerUser?.ownerId ?? currentUserId;
       }
     }
 
@@ -66,6 +91,7 @@ export class UsersService {
       roles,
       factoryId: isFactoryScoped ? (factoryId ?? currentUserFactoryId) : factoryId,
       ownerId: finalOwnerId,
+      managerId: finalManagerId,
       createdBy: currentUserId,
       password: hashedPassword,
     });
@@ -149,10 +175,10 @@ export class UsersService {
       .exec();
   }
 
-  /** MANAGER ve los SALES que gestiona (ownerId apunta al OWNER, así que filtramos por manager como createdBy o campo propio). */
+  /** MANAGER ve los SALES que gestiona por managerId. */
   async findManagedByManager(managerId: string): Promise<User[]> {
     return this.userModel
-      .find({ createdBy: managerId, roles: Role.SALES })
+      .find({ managerId, roles: Role.SALES })
       .select("-password")
       .exec();
   }
@@ -188,7 +214,7 @@ export class UsersService {
     currentUserId: string,
   ): Promise<{ transferred: number; failed: string[] }> {
     if (!currentUserRoles.includes(Role.ADMIN)) {
-      throw new ForbiddenException("Solo ADMIN puede hacer transferencia masiva");
+      throw new ForbiddenException("Solo ADMIN puede hacer transferencia masiva de owner");
     }
 
     const newOwner = await this.userModel.findById(newOwnerId).exec();
@@ -196,26 +222,18 @@ export class UsersService {
       throw new NotFoundException(`New owner with ID ${newOwnerId} not found or is not an OWNER`);
     }
 
-    const transferableRoles = [Role.SALES, Role.MANAGER];
     const failed: string[] = [];
     let transferred = 0;
 
     for (const userId of userIds) {
       try {
         const user = await this.userModel.findById(userId).exec();
-        if (!user) {
-          failed.push(`${userId}: User not found`);
-          continue;
+        if (!user) { failed.push(`${userId}: User not found`); continue; }
+        if (!user.roles.includes(Role.SALES) && !user.roles.includes(Role.MANAGER)) {
+          failed.push(`${userId}: Not a SALES or MANAGER user`); continue;
         }
-
-        if (!transferableRoles.some((r) => user.roles.includes(r))) {
-          failed.push(`${userId}: Not a SALES or MANAGER user`);
-          continue;
-        }
-
         user.ownerId = newOwnerId;
         if (!user.createdBy) user.createdBy = currentUserId;
-
         await user.save();
         transferred++;
       } catch (error) {
@@ -224,5 +242,77 @@ export class UsersService {
     }
 
     return { transferred, failed };
+  }
+
+  /** Asigna/cambia el MANAGER de usuarios SALES. Permitido para ADMIN y OWNER. */
+  async transferManager(userId: string, newManagerId: string, currentUserRoles: Role[]): Promise<User> {
+    const canTransfer = currentUserRoles.includes(Role.ADMIN) || currentUserRoles.includes(Role.OWNER);
+    if (!canTransfer) {
+      throw new ForbiddenException("Solo ADMIN u OWNER pueden cambiar el Manager asignado");
+    }
+
+    const user = await this.userModel.findById(userId).exec();
+    if (!user) throw new NotFoundException(`User with ID ${userId} not found`);
+
+    if (!user.roles.includes(Role.SALES)) {
+      throw new ForbiddenException("Solo usuarios SALES pueden tener Manager asignado");
+    }
+
+    const newManager = await this.userModel.findById(newManagerId).exec();
+    if (!newManager || !newManager.roles.includes(Role.MANAGER)) {
+      throw new NotFoundException(`Manager con ID ${newManagerId} no encontrado o no es MANAGER`);
+    }
+
+    user.managerId = newManagerId;
+    // Actualizar ownerId al del MANAGER si aplica
+    if (newManager.ownerId) user.ownerId = newManager.ownerId;
+    return user.save();
+  }
+
+  /** Asignación masiva de MANAGER a usuarios SALES. Permitido para ADMIN y OWNER. */
+  async batchTransferManager(
+    userIds: string[],
+    newManagerId: string,
+    currentUserRoles: Role[],
+    currentUserId: string,
+  ): Promise<{ transferred: number; failed: string[] }> {
+    const canTransfer = currentUserRoles.includes(Role.ADMIN) || currentUserRoles.includes(Role.OWNER);
+    if (!canTransfer) {
+      throw new ForbiddenException("Solo ADMIN u OWNER pueden hacer asignación masiva de Manager");
+    }
+
+    const newManager = await this.userModel.findById(newManagerId).exec();
+    if (!newManager || !newManager.roles.includes(Role.MANAGER)) {
+      throw new NotFoundException(`Manager con ID ${newManagerId} no encontrado o no es MANAGER`);
+    }
+
+    const failed: string[] = [];
+    let transferred = 0;
+
+    for (const userId of userIds) {
+      try {
+        const user = await this.userModel.findById(userId).exec();
+        if (!user) { failed.push(`${userId}: User not found`); continue; }
+        if (!user.roles.includes(Role.SALES)) {
+          failed.push(`${userId}: Not a SALES user`); continue;
+        }
+        user.managerId = newManagerId;
+        if (newManager.ownerId) user.ownerId = newManager.ownerId;
+        if (!user.createdBy) user.createdBy = currentUserId;
+        await user.save();
+        transferred++;
+      } catch (error) {
+        failed.push(`${userId}: ${error.message}`);
+      }
+    }
+
+    return { transferred, failed };
+  }
+
+  /** Lista los MANAGERs disponibles en una fábrica. */
+  async findManagerUsers(factoryId?: string): Promise<User[]> {
+    const query: any = { roles: Role.MANAGER };
+    if (factoryId) query.factoryId = factoryId;
+    return this.userModel.find(query).select("-password").exec();
   }
 }

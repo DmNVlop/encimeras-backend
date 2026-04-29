@@ -5,6 +5,8 @@ import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { TransferOwnerDto } from "./dto/transfer-owner.dto";
 import { BatchTransferDto } from "./dto/batch-transfer.dto";
+import { TransferManagerDto } from "./dto/transfer-manager.dto";
+import { BatchTransferManagerDto } from "./dto/batch-transfer-manager.dto";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -142,5 +144,34 @@ export class UsersController {
   @ApiResponse({ status: 403, description: "Sin permisos." })
   batchTransferOwnership(@Body() batchTransferDto: BatchTransferDto, @GetUser() user: any) {
     return this.usersService.batchTransferOwnership(batchTransferDto.userIds, batchTransferDto.newOwnerId, user.roles, user.userId);
+  }
+
+  @Get("managers")
+  @Roles(Role.MANAGER)
+  @ApiOperation({ summary: "Lista de usuarios MANAGER disponibles en la fábrica" })
+  @ApiResponse({ status: 200, description: "Lista de MANAGERs." })
+  getManagers(@GetUser() user: any) {
+    const userRoles: Role[] = user?.roles ?? [];
+    const factoryId = this.roleHierarchy.isAtLeast(userRoles, Role.ADMIN) ? undefined : user.factoryId;
+    return this.usersService.findManagerUsers(factoryId);
+  }
+
+  @Post(":id/transfer-manager")
+  @Roles(Role.OWNER)
+  @ApiOperation({ summary: "Asignar/cambiar MANAGER de un SALES (ADMIN u OWNER)" })
+  @ApiResponse({ status: 200, description: "Manager asignado exitosamente." })
+  @ApiResponse({ status: 403, description: "Sin permisos." })
+  @ApiResponse({ status: 404, description: "Usuario o Manager no encontrado." })
+  transferManager(@Param("id") id: string, @Body() transferDto: TransferManagerDto, @GetUser() user: any) {
+    return this.usersService.transferManager(id, transferDto.newManagerId, user.roles);
+  }
+
+  @Post("batch-transfer-manager")
+  @Roles(Role.OWNER)
+  @ApiOperation({ summary: "Asignación masiva de MANAGER a usuarios SALES (ADMIN u OWNER)" })
+  @ApiResponse({ status: 200, description: "Asignación masiva completada." })
+  @ApiResponse({ status: 403, description: "Sin permisos." })
+  batchTransferManager(@Body() batchTransferDto: BatchTransferManagerDto, @GetUser() user: any) {
+    return this.usersService.batchTransferManager(batchTransferDto.userIds, batchTransferDto.newManagerId, user.roles, user.userId);
   }
 }
