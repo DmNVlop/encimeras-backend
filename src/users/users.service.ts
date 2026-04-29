@@ -6,42 +6,55 @@ import { User } from "./schemas/users.schema";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { Role } from "../auth/enums/role.enum";
+import { RoleHierarchyService } from "../auth/services/role-hierarchy.service";
 
 @Injectable()
 export class UsersService {
-  constructor(@InjectModel(User.name) private readonly userModel: Model<User>) {}
+  constructor(
+    @InjectModel(User.name) private readonly userModel: Model<User>,
+    private readonly roleHierarchy: RoleHierarchyService,
+  ) {}
 
-  async create(createUserDto: CreateUserDto, currentUserRoles: string[], currentUserId: string, currentUserFactoryId?: string): Promise<User> {
-    const { username, password, roles, factoryId, ownerId } = createUserDto;
+  async create(createUserDto: CreateUserDto, currentUserRoles: Role[], currentUserId: string, currentUserFactoryId?: string): Promise<User> {
+    const { username, password, roles = [Role.USER], factoryId, ownerId } = createUserDto;
 
     const existingUser = await this.userModel.findOne({ username });
     if (existingUser) {
       throw new ConflictException(`El usuario "${username}" ya existe`);
     }
 
-    const isOwner = currentUserRoles.includes(Role.OWNER) && !currentUserRoles.includes(Role.ADMIN);
-    if (isOwner) {
-      if (roles?.includes(Role.ADMIN) || roles?.includes(Role.OWNER)) {
-        throw new ForbiddenException("OWNER cannot create ADMIN or OWNER users");
-      }
+    // El creador solo puede asignar roles de nivel inferior al suyo
+    if (!this.roleHierarchy.canAssignRoles(currentUserRoles, roles)) {
+      throw new ForbiddenException("No puedes asignar roles iguales o superiores al tuyo");
+    }
+
+    // Usuarios con scope de fábrica solo pueden crear usuarios en su propia fábrica
+    const isFactoryScoped = !currentUserRoles.includes(Role.ADMIN);
+    if (isFactoryScoped) {
       if (factoryId && factoryId !== currentUserFactoryId) {
-        throw new ForbiddenException("OWNER can only create users in their own factory");
+        throw new ForbiddenException("Solo puedes crear usuarios en tu propia fábrica");
       }
     }
 
+    // Resolución de ownerId para usuarios SALES
     let finalOwnerId = ownerId;
-    if (roles?.includes(Role.SALES)) {
+    if (roles.includes(Role.SALES) || roles.includes(Role.MANAGER)) {
       if (currentUserRoles.includes(Role.ADMIN)) {
         if (!ownerId) {
-          throw new ForbiddenException("ADMIN must specify ownerId when creating SALES user");
+          throw new ForbiddenException("ADMIN debe especificar ownerId al crear usuario SALES o MANAGER");
         }
         const ownerUser = await this.userModel.findById(ownerId).exec();
         if (!ownerUser || !ownerUser.roles.includes(Role.OWNER)) {
-          throw new NotFoundException(`Owner with ID ${ownerId} not found or is not an OWNER`);
+          throw new NotFoundException(`Owner con ID ${ownerId} no encontrado o no es OWNER`);
         }
         finalOwnerId = ownerId;
       } else if (currentUserRoles.includes(Role.OWNER)) {
         finalOwnerId = currentUserId;
+      }
+      // MANAGER creando SALES: hereda el ownerId del MANAGER
+      else if (currentUserRoles.includes(Role.MANAGER)) {
+        const managerUser = await this.userModel.findById(currentUserId).exec();
+        finalOwnerId = managerUser?.ownerId ?? currentUserId;
       }
     }
 
@@ -50,6 +63,8 @@ export class UsersService {
 
     const newUser = new this.userModel({
       ...createUserDto,
+      roles,
+      factoryId: isFactoryScoped ? (factoryId ?? currentUserFactoryId) : factoryId,
       ownerId: finalOwnerId,
       createdBy: currentUserId,
       password: hashedPassword,
@@ -76,23 +91,27 @@ export class UsersService {
   }
 
   async findByUsername(username: string): Promise<User | null> {
-    // Este se usa para login, sí devolvemos el password
     return this.userModel.findOne({ username }).exec();
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto, currentUserRoles: string[], currentUserFactoryId?: string): Promise<User> {
+  async update(id: string, updateUserDto: UpdateUserDto, currentUserRoles: Role[], currentUserId: string, currentUserFactoryId?: string): Promise<User> {
     const targetUser = await this.userModel.findById(id).exec();
     if (!targetUser) {
       throw new NotFoundException(`Usuario con ID "${id}" no encontrado`);
     }
 
-    const isOwner = currentUserRoles.includes(Role.OWNER) && !currentUserRoles.includes(Role.ADMIN);
-    if (isOwner) {
-      if (targetUser.factoryId && targetUser.factoryId !== currentUserFactoryId) {
-        throw new ForbiddenException("OWNER can only update users in their own factory");
+    // Scope de fábrica: OWNER y MANAGER solo modifican usuarios de su fábrica
+    const isFactoryScoped = !currentUserRoles.includes(Role.ADMIN);
+    if (isFactoryScoped) {
+      if (targetUser.factoryId && targetUser.factoryId.toString() !== currentUserFactoryId) {
+        throw new ForbiddenException("Solo puedes modificar usuarios de tu propia fábrica");
       }
-      if (updateUserDto.roles?.includes(Role.ADMIN) || updateUserDto.roles?.includes(Role.OWNER)) {
-        throw new ForbiddenException("OWNER cannot assign ADMIN or OWNER roles");
+    }
+
+    // Control de asignación de roles: solo roles inferiores al propio
+    if (updateUserDto.roles) {
+      if (!this.roleHierarchy.canAssignRoles(currentUserRoles, updateUserDto.roles)) {
+        throw new ForbiddenException("No puedes asignar roles iguales o superiores al tuyo");
       }
     }
 
@@ -117,18 +136,30 @@ export class UsersService {
     }
   }
 
+  /** OWNER ve los SALES y MANAGER que gestiona directamente. */
   async findManagedUsers(ownerId: string): Promise<User[]> {
     const ownerUser = await this.userModel.findById(ownerId).exec();
     if (!ownerUser || !ownerUser.roles.includes(Role.OWNER)) {
-      throw new NotFoundException(`Owner with ID ${ownerId} not found or is not an OWNER`);
+      throw new NotFoundException(`Owner con ID ${ownerId} no encontrado o no es OWNER`);
     }
 
-    return this.userModel.find({ ownerId, roles: Role.SALES }).select("-password").exec();
+    return this.userModel
+      .find({ ownerId, roles: { $in: [Role.SALES, Role.MANAGER] } })
+      .select("-password")
+      .exec();
   }
 
-  async transferOwnership(userId: string, newOwnerId: string, currentUserRoles: string[]): Promise<User> {
+  /** MANAGER ve los SALES que gestiona (ownerId apunta al OWNER, así que filtramos por manager como createdBy o campo propio). */
+  async findManagedByManager(managerId: string): Promise<User[]> {
+    return this.userModel
+      .find({ createdBy: managerId, roles: Role.SALES })
+      .select("-password")
+      .exec();
+  }
+
+  async transferOwnership(userId: string, newOwnerId: string, currentUserRoles: Role[]): Promise<User> {
     if (!currentUserRoles.includes(Role.ADMIN)) {
-      throw new ForbiddenException("Only ADMIN can transfer ownership");
+      throw new ForbiddenException("Solo ADMIN puede transferir ownership");
     }
 
     const user = await this.userModel.findById(userId).exec();
@@ -136,8 +167,9 @@ export class UsersService {
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
 
-    if (!user.roles.includes(Role.SALES)) {
-      throw new ForbiddenException("Only SALES users can be transferred between OWNERs");
+    const transferableRoles = [Role.SALES, Role.MANAGER];
+    if (!transferableRoles.some((r) => user.roles.includes(r))) {
+      throw new ForbiddenException("Solo usuarios SALES o MANAGER pueden transferirse entre OWNERs");
     }
 
     const newOwner = await this.userModel.findById(newOwnerId).exec();
@@ -152,11 +184,11 @@ export class UsersService {
   async batchTransferOwnership(
     userIds: string[],
     newOwnerId: string,
-    currentUserRoles: string[],
+    currentUserRoles: Role[],
     currentUserId: string,
   ): Promise<{ transferred: number; failed: string[] }> {
     if (!currentUserRoles.includes(Role.ADMIN)) {
-      throw new ForbiddenException("Only ADMIN can perform batch transfer");
+      throw new ForbiddenException("Solo ADMIN puede hacer transferencia masiva");
     }
 
     const newOwner = await this.userModel.findById(newOwnerId).exec();
@@ -164,6 +196,7 @@ export class UsersService {
       throw new NotFoundException(`New owner with ID ${newOwnerId} not found or is not an OWNER`);
     }
 
+    const transferableRoles = [Role.SALES, Role.MANAGER];
     const failed: string[] = [];
     let transferred = 0;
 
@@ -175,17 +208,13 @@ export class UsersService {
           continue;
         }
 
-        if (!user.roles.includes(Role.SALES)) {
-          failed.push(`${userId}: Not a SALES user`);
+        if (!transferableRoles.some((r) => user.roles.includes(r))) {
+          failed.push(`${userId}: Not a SALES or MANAGER user`);
           continue;
         }
 
         user.ownerId = newOwnerId;
-
-        // Si no existe createdBy, asignarlo con el ID del usuario ADMIN actual
-        if (!user.createdBy) {
-          user.createdBy = currentUserId;
-        }
+        if (!user.createdBy) user.createdBy = currentUserId;
 
         await user.save();
         transferred++;

@@ -13,6 +13,7 @@ import { MaterialsModule } from "./materials/materials.module";
 import { EdgeProfilesModule } from "./edge-profiles/edge-profiles.module";
 import { CutoutsModule } from "./cutouts/cutouts.module";
 import { AuthModule } from "./auth/auth.module";
+import { AuthSharedModule } from "./auth/auth-shared.module";
 import { QuotesModule } from "./quotes/quotes.module";
 import { PriceConfigsModule } from "./price-configs/price-configs.module";
 import { AttributesModule } from "./attributes/attributes.module";
@@ -75,6 +76,7 @@ import { RedisCheckService } from "./redis-check.service";
     ),
 
     // MODULOS DEL SISTEMA
+    AuthSharedModule,
     DatabaseModule,
     MaterialsModule,
     EdgeProfilesModule,

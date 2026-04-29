@@ -54,12 +54,13 @@ export class QuotesController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.OWNER, Role.SALES)
+  @Roles(Role.SALES) // nivel 2 mínimo → MANAGER, OWNER y ADMIN también acceden
   @Get()
-  @ApiOperation({ summary: "Get all quotes (Admin, Owner & Sales)" })
+  @ApiOperation({ summary: "Get all quotes (Admin, Owner, Manager & Sales)" })
   findAll(@GetUser() user: any) {
     const factoryId = user?.factoryId;
-    if (user?.roles.includes(Role.OWNER) && factoryId) {
+    // OWNER y MANAGER ven solo su fábrica
+    if ((user?.roles.includes(Role.OWNER) || user?.roles.includes(Role.MANAGER)) && factoryId) {
       return this.quotesService.findAllByFactory(factoryId);
     }
     return this.quotesService.findAll();
@@ -67,12 +68,12 @@ export class QuotesController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.OWNER, Role.SALES)
+  @Roles(Role.SALES) // nivel 2 mínimo
   @Get(":id")
-  @ApiOperation({ summary: "Get a single quote by ID (Admin, Owner & Sales)" })
+  @ApiOperation({ summary: "Get a single quote by ID (Admin, Owner, Manager & Sales)" })
   findOne(@Param("id") id: string, @GetUser() user: any) {
     const factoryId = user?.factoryId;
-    if (user?.roles.includes(Role.OWNER) && factoryId) {
+    if ((user?.roles.includes(Role.OWNER) || user?.roles.includes(Role.MANAGER)) && factoryId) {
       return this.quotesService.findOneByFactory(id, factoryId);
     }
     return this.quotesService.findOne(id);

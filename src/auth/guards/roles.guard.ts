@@ -2,25 +2,28 @@ import { Injectable, CanActivate, ExecutionContext } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { ROLES_KEY } from "../decorators/roles.decorator";
 import { Role } from "../enums/role.enum";
+import { RoleHierarchyService } from "../services/role-hierarchy.service";
 
 @Injectable()
 export class RolesGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly roleHierarchy: RoleHierarchyService,
+  ) {}
 
   canActivate(context: ExecutionContext): boolean {
-    // Leemos los roles requeridos por el decorador @Roles(...)
-    const requiredRoles = this.reflector.getAllAndOverride<Role[]>(ROLES_KEY, [context.getHandler(), context.getClass()]);
+    const requiredRoles = this.reflector.getAllAndOverride<Role[]>(ROLES_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
 
-    // Si la ruta no tiene roles requeridos, dejamos pasar
-    if (!requiredRoles) {
-      return true;
-    }
+    // Sin @Roles() → ruta pública (tras JWT)
+    if (!requiredRoles || requiredRoles.length === 0) return true;
 
-    // Obtenemos el usuario que insertó el JwtStrategy
     const { user } = context.switchToHttp().getRequest();
+    if (!user?.roles) return false;
 
-    // Lógica de Arrays:
-    // Verificamos si user.roles tiene AL MENOS UNO de los requiredRoles
-    return requiredRoles.some((role) => user.roles?.includes(role));
+    // Jerarquía: el usuario accede si su nivel >= nivel mínimo de los roles requeridos
+    return this.roleHierarchy.canAccess(user.roles as Role[], requiredRoles);
   }
 }
