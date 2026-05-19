@@ -34,6 +34,9 @@ export class CartItem {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: "Draft" })
   draftId?: string;
 
+  @Prop({ type: MongooseSchema.Types.Mixed, default: [] })
+  piecesBreakdown: any[]; // Desglose de precios por pieza y addon (se recalcula en cada cambio)
+
   /**
    * Este campo NO se guarda en la DB.
    * Se llena dinámicamente en el Service (patrón BFF) para enviar al Front

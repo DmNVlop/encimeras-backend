@@ -65,6 +65,9 @@ export class OrderLineItem {
 
   @Prop({ type: MongooseSchema.Types.Mixed, default: [] })
   appliedRules: any[]; // Reglas de descuento aplicadas a este ítem
+
+  @Prop({ type: MongooseSchema.Types.Mixed, default: [] })
+  piecesBreakdown: any[]; // Desglose inmutable de precios por pieza y addon
 }
 
 @Schema({ timestamps: true })

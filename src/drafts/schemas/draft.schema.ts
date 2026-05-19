@@ -33,6 +33,9 @@ export class Draft extends Document {
   @Prop({ required: true, default: 0 })
   discountAmount: number;
 
+  @Prop({ type: MongooseSchema.Types.Mixed, default: [] })
+  piecesBreakdown: any[]; // Desglose de precios por pieza y addon
+
   @Prop({ required: true, index: true })
   expirationDate: Date; // Fecha límite de validez
 

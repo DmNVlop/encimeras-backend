@@ -7,6 +7,7 @@ import { DraftsService } from "../drafts/drafts.service";
 import { EventsGateway } from "../events/events.gateway";
 import { CartService } from "../cart/cart.service";
 import { UsersService } from "../users/users.service";
+import { QuotesService } from "../quotes/quotes.service";
 
 @Injectable()
 export class OrdersService {
@@ -16,6 +17,7 @@ export class OrdersService {
     private eventsGateway: EventsGateway,
     private cartService: CartService,
     private usersService: UsersService,
+    private quotesService: QuotesService,
   ) {}
 
   /**
@@ -151,8 +153,23 @@ export class OrdersService {
       // Por ahora lo permitimos asumiendo que el frontend ya mostró el aviso
     }
 
-    // 3. Generar ID Secuencial (Ejemplo simple, idealmente usar una colección de contadores atómicos)
+    // 3. Generar ID Secuencial
     const orderNumber = await this.generateOrderNumber();
+
+    // 3b. Resolver breakdown por pieza — usar el del draft si existe, recalcular si no
+    let draftBreakdown: any[] = (draft as any).piecesBreakdown || [];
+    if (draftBreakdown.length === 0) {
+      try {
+        const calc = await this.quotesService.calculate({
+          mainPieces: draft.core.mainPieces,
+          factoryId: draft.core.factoryId,
+          customerId: draft.core.customerId || userId,
+        });
+        draftBreakdown = calc.pieces;
+      } catch {
+        // Fallback silencioso — breakdown queda vacío
+      }
+    }
 
     // 4. Construir el Shared-Header y el Snapshot Técnico
     const newOrder = new this.orderModel({
@@ -162,9 +179,8 @@ export class OrdersService {
         userId: userId,
         customerId: createOrderDto.customerId || draft.core.customerId,
         status: "PENDING",
-        totalPoints: draft.currentPricePoints, // Precio congelado
+        totalPoints: draft.currentPricePoints,
         orderDate: new Date(),
-        // deliveryDate: createOrderDto.deliveryInfo?.date // Si existiera
       },
       items: [
         {
@@ -174,6 +190,8 @@ export class OrdersService {
           uiState: draft.uiState,
           originalPoints: (draft as any).originalPoints || draft.currentPricePoints,
           discountAmount: (draft as any).discountAmount || 0,
+          subtotalPoints: draft.currentPricePoints,
+          piecesBreakdown: draftBreakdown,
         },
       ],
       originDraftId: draft._id,
@@ -245,13 +263,14 @@ export class OrdersService {
     // 3. Mapear cada CartItem a un OrderLineItem — snapshot inmutable completo
     const orderItems = cartData.items.map((item: any) => ({
       type: "COUNTERTOP_PROJECT",
-      cartItemName: item.customName, // Trazabilidad: "Cocina de Juana"
+      cartItemName: item.customName,
       core: item.core,
       uiState: item.uiState,
       originalPoints: item.originalPoints || item.subtotalPoints,
       discountAmount: item.discountAmount || 0,
-      subtotalPoints: item.subtotalPoints, // ← Precio final con descuento por ítem
-      appliedRules: item.appliedRules || [], // ← Reglas de descuento aplicadas al ítem
+      subtotalPoints: item.subtotalPoints,
+      appliedRules: item.appliedRules || [],
+      piecesBreakdown: item.piecesBreakdown || [],
     }));
 
     // 4. Crear la Orden Unificada

@@ -55,6 +55,8 @@ export class QuotesService {
         materialId: piece.materialId,
         materialName: material?.name || "Desconocido",
         materialCategory: material?.category || "GENERAL",
+        length_mm: piece.length_mm || 0,
+        width_mm: piece.width_mm || 0,
         basePricePoints: 0,
         addons: [],
         subtotalPoints: 0,
@@ -73,10 +75,13 @@ export class QuotesService {
           pieceSubtotal += addonPrice;
 
           pieceDetail.addons.push({
+            code: addon.code,
             addonName: addon.code,
             name: addonMaster.name,
             imageUrl: addonMaster.imageUrl,
             pricePoints: addonPrice,
+            measurements: addon.measurements,
+            quantity: addon.measurements?.quantity || addon.quantity,
           });
         }
       }

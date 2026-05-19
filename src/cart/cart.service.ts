@@ -97,10 +97,11 @@ export class CartService {
       customName: addToCartDto.customName,
       core: addToCartDto.core,
       uiState: addToCartDto.uiState,
-      subtotalPoints: calculation.finalTotalPoints, // Precio REAL con descuento
-      originalPoints: calculation.totalPoints, // Precio original sin descuento
+      subtotalPoints: calculation.finalTotalPoints,
+      originalPoints: calculation.totalPoints,
       discountAmount: calculation.totalDiscount,
       appliedRules: calculation.appliedRules,
+      piecesBreakdown: calculation.pieces,
       draftId: addToCartDto.draftId,
     };
 
@@ -167,6 +168,7 @@ export class CartService {
       cart.items[itemIndex].originalPoints = calculation.totalPoints;
       cart.items[itemIndex].discountAmount = calculation.totalDiscount;
       cart.items[itemIndex].appliedRules = calculation.appliedRules;
+      (cart.items[itemIndex] as any).piecesBreakdown = calculation.pieces;
     }
 
     if (updateDto.uiState) {
@@ -242,6 +244,20 @@ export class CartService {
       const alreadyInCart = activeCart.items.some((item) => item.draftId === draftIdStr);
       if (alreadyInCart) continue;
 
+      let draftBreakdown: any[] = (draft as any).piecesBreakdown || [];
+      if (draftBreakdown.length === 0) {
+        try {
+          const calc = await this.quotesService.calculate({
+            mainPieces: draft.core.mainPieces,
+            factoryId: draft.core.factoryId,
+            customerId: draft.core.customerId,
+          });
+          draftBreakdown = calc.pieces;
+        } catch {
+          // Fallback silencioso — breakdown queda vacío
+        }
+      }
+
       const cartItem: any = {
         cartItemId: uuidv4(),
         customName: draft.name || "Borrador importado",
@@ -250,6 +266,7 @@ export class CartService {
         subtotalPoints: draft.currentPricePoints,
         originalPoints: (draft as any).originalPoints || draft.currentPricePoints,
         discountAmount: (draft as any).discountAmount || 0,
+        piecesBreakdown: draftBreakdown,
         draftId: draftIdStr,
       };
 
@@ -349,11 +366,12 @@ export class CartService {
         grossTotal += p.subtotalPoints;
       });
 
-      // Actualizamos metadatos del ítem para reflejar el estado bruto antes de reglas globales
+      // Actualizamos metadatos del ítem — breakdown queda en estado bruto (sin descuentos globales aún)
       item.originalPoints = calculation.totalPoints;
       item.subtotalPoints = calculation.totalPoints;
       item.discountAmount = 0;
       item.appliedRules = [];
+      (item as any).piecesBreakdown = calculation.pieces;
     }
 
     // 3. Ejecutar el motor de descuentos global
