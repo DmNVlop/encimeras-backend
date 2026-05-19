@@ -164,11 +164,33 @@ export class UsersService {
     return updatedUser;
   }
 
-  async remove(id: string): Promise<void> {
-    const result = await this.userModel.findByIdAndDelete(id).exec();
-    if (!result) {
+  async remove(id: string, callerRoles: Role[], callerId: string, callerFactoryId?: string): Promise<void> {
+    const target = await this.userModel.findById(id).exec();
+    if (!target) {
       throw new NotFoundException(`Usuario con ID "${id}" no encontrado`);
     }
+
+    const isAdmin = callerRoles.includes(Role.ADMIN);
+    const isOwner = callerRoles.includes(Role.OWNER);
+    const isManager = callerRoles.includes(Role.MANAGER);
+
+    if (isAdmin) {
+      // sin restricciones
+    } else if (isOwner) {
+      // solo usuarios de su fábrica
+      if (target.factoryId?.toString() !== callerFactoryId) {
+        throw new ForbiddenException("Solo puedes eliminar usuarios de tu propia fábrica");
+      }
+    } else if (isManager) {
+      // solo sus SALES directos
+      if (!target.roles.includes(Role.SALES) || target.managerId?.toString() !== callerId) {
+        throw new ForbiddenException("Solo puedes eliminar usuarios SALES que gestionas directamente");
+      }
+    } else {
+      throw new ForbiddenException("No tienes permisos para eliminar usuarios");
+    }
+
+    await this.userModel.findByIdAndDelete(id).exec();
   }
 
   /** OWNER ve los SALES y MANAGER que gestiona directamente. */
@@ -316,6 +338,27 @@ export class UsersService {
     }
 
     return { transferred, failed };
+  }
+
+  async batchRemove(
+    userIds: string[],
+    callerRoles: Role[],
+    callerId: string,
+    callerFactoryId?: string,
+  ): Promise<{ deleted: number; failed: string[] }> {
+    const failed: string[] = [];
+    let deleted = 0;
+
+    for (const id of userIds) {
+      try {
+        await this.remove(id, callerRoles, callerId, callerFactoryId);
+        deleted++;
+      } catch (err) {
+        failed.push(`${id}: ${err.message}`);
+      }
+    }
+
+    return { deleted, failed };
   }
 
   /** Lista los MANAGERs disponibles en una fábrica. */
