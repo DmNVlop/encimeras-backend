@@ -41,7 +41,7 @@ export class OrdersController {
       return this.ordersService.findAllByManager(user.userId, status);
     }
     if (user.roles.includes(Role.SALES)) {
-      return this.ordersService.findAllHeaders(status, undefined);
+      return this.ordersService.findAllHeaders(status, user.userId);
     }
     return this.ordersService.findAllHeaders(status, user.userId);
   }

@@ -134,13 +134,23 @@ export class UsersController {
     return this.usersService.update(id, updateUserDto, userRoles, user.userId, user.factoryId);
   }
 
+  @Delete("batch")
+  @Roles(Role.MANAGER)
+  @ApiOperation({ summary: "Eliminar usuarios en lote (ADMIN/OWNER: cualquiera de su fábrica; MANAGER: solo sus SALES)" })
+  @ApiResponse({ status: 200, description: "Resultado del borrado masivo." })
+  @ApiResponse({ status: 403, description: "Sin permisos." })
+  batchRemove(@Body() body: { userIds: string[] }, @GetUser() user: any) {
+    return this.usersService.batchRemove(body.userIds, user.roles, user.userId, user.factoryId);
+  }
+
   @Delete(":id")
-  @Roles(Role.ADMIN)
-  @ApiOperation({ summary: "Eliminar usuario (solo ADMIN)" })
+  @Roles(Role.MANAGER)
+  @ApiOperation({ summary: "Eliminar usuario (ADMIN/OWNER: cualquiera; MANAGER: solo sus SALES)" })
   @ApiResponse({ status: 204, description: "Usuario eliminado." })
+  @ApiResponse({ status: 403, description: "Sin permisos." })
   @ApiResponse({ status: 404, description: "No encontrado." })
-  remove(@Param("id") id: string) {
-    return this.usersService.remove(id);
+  remove(@Param("id") id: string, @GetUser() user: any) {
+    return this.usersService.remove(id, user.roles, user.userId, user.factoryId);
   }
 
   @Post(":id/transfer-owner")
