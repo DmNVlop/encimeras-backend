@@ -8,6 +8,7 @@ import { UpdateCustomerDto } from "./dto/update-customer.dto";
 import { BatchAssignUsersDto } from "./dto/batch-assign-sales.dto";
 import { FactorySettingsService } from "../factory-settings/factory-settings.service";
 import { Role } from "../auth/enums/role.enum";
+import { CustomerType } from "./enums/customer-type.enum";
 
 @Injectable()
 export class CustomersService {
@@ -187,6 +188,13 @@ export class CustomersService {
       if (!multiSales && sanitizedDto.assignedUserIds.length > 1) {
         throw new ForbiddenException("Multi-user assignment per customer is disabled. Only one user can be assigned.");
       }
+    }
+
+    const customerType = sanitizedDto.type ?? customer.type;
+    if (customerType === CustomerType.INDIVIDUAL && (sanitizedDto.firstName !== undefined || sanitizedDto.lastName !== undefined)) {
+      const firstName = sanitizedDto.firstName ?? customer.firstName ?? "";
+      const lastName = sanitizedDto.lastName ?? customer.lastName ?? "";
+      sanitizedDto.officialName = `${firstName} ${lastName}`.trim();
     }
 
     const updatedCustomer = await this.customerModel.findByIdAndUpdate(id, sanitizedDto, { new: true }).exec();
