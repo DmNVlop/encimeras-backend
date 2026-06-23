@@ -120,30 +120,34 @@ export class QuotesService {
     }
 
     // --- INTEGRACIÓN DE DESCUENTOS ---
-    // Convertimos nuestras piezas en items procesables por el motor de descuentos
+    // El descuento aplica SOLO sobre la base del material (basePricePoints), no sobre addons/extras
     const discountableItems = piecesBreakdown.map((p) => ({
       id: p.materialId,
       name: p.pieceName,
       category: p.materialCategory,
-      price: p.subtotalPoints,
+      price: p.basePricePoints,
       quantity: 1,
     }));
 
     const discountResult = await this.discountEngineService.calculateDiscounts(discountableItems, factoryId, calculateQuoteDto.customerId);
 
     // Mapeamos los descuentos de vuelta a las piezas (el orden se mantiene)
+    // finalPricePoints = base descontada + addons (los extras NO se descuentan)
     const piecesWithDiscounts = piecesBreakdown.map((p, idx) => {
       const itemDiscount = discountResult.itemBreakdown[idx];
+      const addonsTotal = p.subtotalPoints - p.basePricePoints;
+      const discountedBase = itemDiscount?.finalPrice ?? p.basePricePoints;
       return {
         ...p,
         discountAmount: itemDiscount?.discountAmount || 0,
-        finalPricePoints: itemDiscount?.finalPrice || p.subtotalPoints,
+        finalPricePoints: discountedBase + addonsTotal,
       };
     });
 
+    const totalAddons = piecesBreakdown.reduce((s: number, p: any) => s + (p.subtotalPoints - p.basePricePoints), 0);
     return {
       totalPoints: totalProjectPoints,
-      finalTotalPoints: discountResult.finalTotal,
+      finalTotalPoints: discountResult.finalTotal + totalAddons,
       totalDiscount: discountResult.totalDiscount,
       appliedRules: discountResult.appliedRules,
       pieces: piecesWithDiscounts,

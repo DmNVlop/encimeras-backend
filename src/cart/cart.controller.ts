@@ -58,6 +58,14 @@ export class CartController {
     return this.cartService.removeItems(req.user.userId, removeDto.ids);
   }
 
+  @Delete("customer")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Quitar el cliente asignado al carrito" })
+  async clearCustomer(@Req() req) {
+    return this.cartService.clearCustomer(req.user.userId);
+  }
+
   @Post("save-as-drafts")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

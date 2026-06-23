@@ -20,6 +20,19 @@ export interface DiscountEngineResult {
     ruleName: string;
     discountAmount: number;
   }[];
+  appliedGlobalRules: {
+    ruleId: string;
+    ruleName: string;
+    discountAmount: number;
+  }[];
+  appliedRulesByItem?: {
+    itemIndex: number;
+    appliedRules: {
+      ruleId: string;
+      ruleName: string;
+      discountAmount: number;
+    }[];
+  }[];
   itemBreakdown: {
     itemId: string;
     originalPrice: number;
@@ -33,10 +46,7 @@ export class DiscountEngineService {
   constructor(private readonly discountRulesService: DiscountRulesService) {}
 
   async calculateDiscounts(items: DiscountableItem[], factoryId: string, customerId?: string | any): Promise<DiscountEngineResult> {
-    // Obtener reglas activas y aplicables según cliente
     const activeRules = await this.discountRulesService.findActiveRules(factoryId);
-
-    // Aseguramos que customerId sea un string primitivo (no un ObjectId)
     const normalizedCustomerId = customerId ? customerId.toString() : undefined;
 
     const applicableRules = activeRules.filter((rule) => {
@@ -53,16 +63,21 @@ export class DiscountEngineService {
 
     const originalTotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const appliedRulesSummary: any[] = [];
-    const itemBreakdown = items.map((item) => ({
-      itemId: item.id,
-      originalPrice: item.price,
-      finalPrice: item.price,
-      discountAmount: 0,
-      currentPrice: item.price, // Precio que va variando con cada regla
-    }));
+    // Map<itemIndex, Map<ruleId, discountAmount>> — descuento real por regla por ítem
+    const appliedRulesByItemMap: Map<number, Map<string, number>> = new Map();
 
-    // El motor procesa reglas en orden de prioridad (findActiveRules ya las trae ordenadas DESC por priority)
-    // Para cada regla, verificamos si se puede aplicar (stackability)
+    const itemBreakdown = items.map((item, idx) => {
+      appliedRulesByItemMap.set(idx, new Map());
+      return {
+        itemId: item.id,
+        itemIndex: idx,
+        originalPrice: item.price,
+        finalPrice: item.price,
+        discountAmount: 0,
+        currentPrice: item.price,
+      };
+    });
+
     let isStackableBlocked = false;
 
     for (const rule of applicableRules) {
@@ -70,38 +85,36 @@ export class DiscountEngineService {
 
       let ruleApplied = false;
       let ruleTotalDiscount = 0;
+      const ruleId = (rule as any)._id;
 
       if (rule.scope === DiscountScope.GLOBAL_TOTAL) {
-        // --- REGLA GLOBAL ---
         const currentGlobalTotal = itemBreakdown.reduce((sum, ib) => {
           const source = items.find((i) => i.id === ib.itemId);
           return sum + ib.currentPrice * (source?.quantity || 1);
         }, 0);
 
-        // Validar minOrderValue
         if (rule.conditions?.minOrderValue && currentGlobalTotal < rule.conditions.minOrderValue) {
           continue;
         }
 
         const discountResult = this.calculateRuleValue(rule, currentGlobalTotal);
         if (discountResult > 0) {
-          // Repartimos el descuento proporcionalmente entre los items para mantener consistencia
-          // O lo aplicamos al total (aquí lo aplicamos al total interno)
           ruleTotalDiscount = discountResult;
-
-          // Ajustar proporcionalmente cada item (Cascade)
           const ratio = (currentGlobalTotal - discountResult) / currentGlobalTotal;
+
           itemBreakdown.forEach((ib) => {
             const oldPrice = ib.currentPrice;
             ib.currentPrice = ib.currentPrice * ratio;
-            ib.discountAmount += oldPrice - ib.currentPrice;
+            const itemDiscount = oldPrice - ib.currentPrice;
+            ib.discountAmount += itemDiscount;
             ib.finalPrice = ib.currentPrice;
+            const ruleMap = appliedRulesByItemMap.get(ib.itemIndex)!;
+            ruleMap.set(ruleId, (ruleMap.get(ruleId) ?? 0) + itemDiscount);
           });
 
           ruleApplied = true;
         }
       } else {
-        // --- REGLA POR ITEM / CATEGORIA ---
         for (const ib of itemBreakdown) {
           const source = items.find((i) => i.id === ib.itemId);
           if (!source) continue;
@@ -118,6 +131,8 @@ export class DiscountEngineService {
               ib.finalPrice = ib.currentPrice;
               ruleTotalDiscount += discount * source.quantity;
               ruleApplied = true;
+              const ruleMap = appliedRulesByItemMap.get(ib.itemIndex)!;
+              ruleMap.set(ruleId, (ruleMap.get(ruleId) ?? 0) + discount * source.quantity);
             }
           }
         }
@@ -125,12 +140,11 @@ export class DiscountEngineService {
 
       if (ruleApplied) {
         appliedRulesSummary.push({
-          ruleId: (rule as any)._id,
+          ruleId,
           ruleName: rule.name,
           discountAmount: ruleTotalDiscount,
         });
 
-        // Si la regla dice que NO es stackable, bloqueamos las siguientes de menor prioridad
         if (rule.stackable === false) {
           isStackableBlocked = true;
         }
@@ -142,11 +156,33 @@ export class DiscountEngineService {
       return sum + ib.currentPrice * (source?.quantity || 1);
     }, 0);
 
+    // Build appliedRulesByItem array con descuento real por regla por ítem
+    const appliedRulesByItem = Array.from(appliedRulesByItemMap.entries())
+      .map(([itemIndex, ruleAmounts]) => ({
+        itemIndex,
+        appliedRules: Array.from(ruleAmounts.entries()).map(([ruleId, discountAmount]) => {
+          const summary = appliedRulesSummary.find(r => r.ruleId === ruleId);
+          return {
+            ruleId,
+            ruleName: summary?.ruleName ?? '',
+            discountAmount: Math.round(discountAmount * 100) / 100,
+          };
+        }),
+      }));
+
+    // Separate global rules (scope=GLOBAL_TOTAL) from all applied rules
+    const appliedGlobalRules = appliedRulesSummary.filter(r => {
+      const rule = applicableRules.find(ar => (ar as any)._id === r.ruleId);
+      return rule?.scope === DiscountScope.GLOBAL_TOTAL;
+    });
+
     return {
       originalTotal,
       finalTotal: Math.round(finalTotal * 100) / 100,
       totalDiscount: Math.round((originalTotal - finalTotal) * 100) / 100,
       appliedRules: appliedRulesSummary,
+      appliedGlobalRules,
+      appliedRulesByItem,
       itemBreakdown: itemBreakdown.map((ib) => ({
         itemId: ib.itemId,
         originalPrice: ib.originalPrice,
