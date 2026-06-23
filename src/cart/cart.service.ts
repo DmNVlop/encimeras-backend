@@ -310,6 +310,27 @@ export class CartService {
     return this.getOrCreateCart(userId);
   }
 
+  async clearCustomer(userId: string): Promise<any> {
+    const cart = await this.cartModel.findOne({ userId, status: "ACTIVE" }).exec();
+    if (!cart) throw new NotFoundException("Carrito no encontrado");
+
+    cart.customerId = undefined;
+
+    if (cart.items && cart.items.length > 0) {
+      for (const item of cart.items) {
+        if (item.core) {
+          item.core.customerId = undefined;
+        }
+      }
+      cart.markModified("items");
+    }
+
+    await this.recalculateCartTotals(cart);
+    await cart.save();
+
+    return this.getOrCreateCart(userId);
+  }
+
   /**
    * Recalcula los totales del carrito aplicando reglas globales
    */
@@ -403,7 +424,23 @@ export class CartService {
 
         item.discountAmount = itemDiscountAmount;
         item.subtotalPoints = itemDiscountedBase + itemAddons[idx];
-        item.appliedRules = discountResult.appliedRules;
+
+        // Agregar appliedRules de todas las piezas del ítem, agrupando por ruleId y sumando discountAmount
+        const ruleMap = new Map<string, { ruleId: string; ruleName: string; discountAmount: number }>();
+        for (let pieceIdx = pieceOffset - count; pieceIdx < pieceOffset; pieceIdx++) {
+          const pieceRules = discountResult.appliedRulesByItem?.find((r) => r.itemIndex === pieceIdx);
+          if (pieceRules) {
+            for (const r of pieceRules.appliedRules) {
+              const existing = ruleMap.get(r.ruleId);
+              if (existing) {
+                existing.discountAmount = Math.round((existing.discountAmount + r.discountAmount) * 100) / 100;
+              } else {
+                ruleMap.set(r.ruleId, { ruleId: r.ruleId, ruleName: r.ruleName, discountAmount: r.discountAmount });
+              }
+            }
+          }
+        }
+        item.appliedRules = Array.from(ruleMap.values());
       });
 
       // 5. Asignar resultados al carrito
@@ -411,7 +448,7 @@ export class CartService {
       cart.totalOriginalPoints = grossTotal;
       cart.totalPoints = discountResult.finalTotal + grossAddonsTotal;
       cart.totalDiscount = discountResult.totalDiscount;
-      cart.appliedGlobalRules = discountResult.appliedRules;
+      cart.appliedGlobalRules = discountResult.appliedGlobalRules;
     } else {
       // Fallback si no hay factoryId (no se aplican reglas)
       cart.totalOriginalPoints = grossTotal;
