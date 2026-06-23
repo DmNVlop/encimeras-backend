@@ -339,6 +339,12 @@ export class CartService {
     // 2. Obtener todos los ítems base brutos para el motor de descuentos
     const allPieces: any[] = [];
     let grossTotal = 0;
+    let grossAddonsTotal = 0;
+
+    // Registra cuántas piezas aporta cada ítem al array allPieces (para recomponer el breakdown por ítem)
+    const itemPieceCounts: number[] = [];
+    // Registra los addons de cada ítem (subtotal - base), para reconstruir subtotalPoints con descuento
+    const itemAddons: number[] = [];
 
     for (const item of cart.items) {
       // Sincronización forzada: Si el carrito tiene cliente, el item DEBE tener ese cliente y su fábrica
@@ -354,17 +360,23 @@ export class CartService {
         customerId: item.core.customerId || cart.customerId,
       });
 
-      // Mapeamos las piezas al formato del motor
+      // Mapeamos las piezas al formato del motor — solo base, los extras no se descuentan
+      let itemAddonsTotal = 0;
       calculation.pieces.forEach((p: any) => {
         allPieces.push({
           id: p.materialId,
           name: p.pieceName,
           category: p.materialCategory,
-          price: p.subtotalPoints,
+          price: p.basePricePoints,
           quantity: 1,
         });
         grossTotal += p.subtotalPoints;
+        grossAddonsTotal += p.subtotalPoints - p.basePricePoints;
+        itemAddonsTotal += p.subtotalPoints - p.basePricePoints;
       });
+
+      itemPieceCounts.push(calculation.pieces.length);
+      itemAddons.push(itemAddonsTotal);
 
       // Actualizamos metadatos del ítem — breakdown queda en estado bruto (sin descuentos globales aún)
       item.originalPoints = calculation.totalPoints;
@@ -378,9 +390,26 @@ export class CartService {
     if (globalFactoryId) {
       const discountResult = await this.discountEngineService.calculateDiscounts(allPieces, globalFactoryId, cart.customerId);
 
-      // 4. Asignar resultados al carrito
+      // 4. Mapear el breakdown por pieza de vuelta a cada ítem del carrito
+      // itemBreakdown está alineado posicionalmente con allPieces, que se construyó en el mismo orden que cart.items
+      let pieceOffset = 0;
+      cart.items.forEach((item, idx) => {
+        const count = itemPieceCounts[idx];
+        const itemBreakdownSlice = discountResult.itemBreakdown.slice(pieceOffset, pieceOffset + count);
+        pieceOffset += count;
+
+        const itemDiscountAmount = itemBreakdownSlice.reduce((sum: number, b: any) => sum + (b.discountAmount ?? 0), 0);
+        const itemDiscountedBase = itemBreakdownSlice.reduce((sum: number, b: any) => sum + (b.finalPrice ?? 0), 0);
+
+        item.discountAmount = itemDiscountAmount;
+        item.subtotalPoints = itemDiscountedBase + itemAddons[idx];
+        item.appliedRules = discountResult.appliedRules;
+      });
+
+      // 5. Asignar resultados al carrito
+      // finalTotal del engine es solo bases descontadas; sumamos los addons para el total real
       cart.totalOriginalPoints = grossTotal;
-      cart.totalPoints = discountResult.finalTotal;
+      cart.totalPoints = discountResult.finalTotal + grossAddonsTotal;
       cart.totalDiscount = discountResult.totalDiscount;
       cart.appliedGlobalRules = discountResult.appliedRules;
     } else {
