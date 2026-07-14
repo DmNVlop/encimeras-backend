@@ -45,7 +45,7 @@ class Address {
 
 @Schema({ timestamps: true })
 export class Customer {
-  @Prop({ required: true, enum: CustomerType })
+  @Prop({ type: String, required: true, enum: CustomerType })
   type: CustomerType;
 
   @Prop()

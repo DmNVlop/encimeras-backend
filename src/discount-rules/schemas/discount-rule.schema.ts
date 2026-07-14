@@ -12,7 +12,7 @@ class DiscountConditions {
   @Prop()
   endDate: Date;
 
-  @Prop({ enum: CustomerStrategy, default: CustomerStrategy.ALL })
+  @Prop({ type: String, enum: CustomerStrategy, default: CustomerStrategy.ALL })
   customerStrategy: CustomerStrategy;
 
   @Prop({ type: [{ type: MongooseSchema.Types.ObjectId, ref: "Customer" }] })
@@ -27,13 +27,13 @@ export class DiscountRule {
   @Prop({ required: true })
   name: string;
 
-  @Prop({ required: true, enum: DiscountType })
+  @Prop({ type: String, required: true, enum: DiscountType })
   type: DiscountType;
 
   @Prop({ required: true })
   value: number;
 
-  @Prop({ required: true, enum: DiscountScope })
+  @Prop({ type: String, required: true, enum: DiscountScope })
   scope: DiscountScope;
 
   @Prop({ type: [String] })
@@ -45,7 +45,7 @@ export class DiscountRule {
   @Prop({ default: 0 })
   priority: number;
 
-  @Prop({ enum: CollisionStrategy, default: CollisionStrategy.SUM })
+  @Prop({ type: String, enum: CollisionStrategy, default: CollisionStrategy.SUM })
   collisionStrategy: CollisionStrategy;
 
   @Prop({ default: true })

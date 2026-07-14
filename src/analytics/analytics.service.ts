@@ -5,16 +5,32 @@ import { Order } from "../orders/schemas/order.schema";
 import { Draft } from "../drafts/schemas/draft.schema";
 import { AnalyticsQueryDto, AnalyticsStatus } from "./dto/analytics-query.dto";
 import { AnalyticsSummaryDto } from "./dto/analytics-summary.dto";
+import { UsersService } from "../users/users.service";
+import { Role } from "../auth/enums/role.enum";
 
 @Injectable()
 export class AnalyticsService {
   constructor(
     @InjectModel(Order.name) private orderModel: Model<Order>,
     @InjectModel(Draft.name) private draftModel: Model<Draft>,
+    private usersService: UsersService,
   ) {}
 
-  async getSummary(query: AnalyticsQueryDto): Promise<AnalyticsSummaryDto> {
+  private async resolveUserIdScope(user: { userId: string; roles: Role[] }): Promise<string[] | undefined> {
+    if (user.roles.includes(Role.ADMIN) || user.roles.includes(Role.OWNER)) {
+      return undefined;
+    }
+    if (user.roles.includes(Role.MANAGER)) {
+      const salesUsers = await this.usersService.findManagedByManager(user.userId);
+      const salesIds = salesUsers.map((u) => (u as any)._id.toString());
+      return [user.userId, ...salesIds];
+    }
+    return [user.userId];
+  }
+
+  async getSummary(query: AnalyticsQueryDto, user: { userId: string; roles: Role[] }): Promise<AnalyticsSummaryDto> {
     const { startDate, endDate, status, factoryId } = query;
+    const userIdScope = await this.resolveUserIdScope(user);
 
     const dateFilter: any = {};
     const effectiveStatus = status || AnalyticsStatus.ALL;
@@ -37,12 +53,12 @@ export class AnalyticsService {
     };
 
     if (effectiveStatus === AnalyticsStatus.ORDER || effectiveStatus === AnalyticsStatus.ALL) {
-      const orderResults = await this.aggregateOrders(dateFilter, factoryId);
+      const orderResults = await this.aggregateOrders(dateFilter, factoryId, userIdScope);
       this.mergeResults(results, orderResults);
     }
 
     if (effectiveStatus === AnalyticsStatus.DRAFT || effectiveStatus === AnalyticsStatus.ALL) {
-      const draftResults = await this.aggregateDrafts(dateFilter, factoryId);
+      const draftResults = await this.aggregateDrafts(dateFilter, factoryId, userIdScope);
       this.mergeResults(results, draftResults);
     }
 
@@ -61,13 +77,16 @@ export class AnalyticsService {
     return results;
   }
 
-  private async aggregateOrders(dateFilter: any, factoryId?: string) {
+  private async aggregateOrders(dateFilter: any, factoryId?: string, userIdScope?: string[]) {
     const match: any = {};
     if (Object.keys(dateFilter).length > 0) {
       match["header.orderDate"] = dateFilter;
     }
     if (factoryId) {
-      match["header.factoryId"] = factoryId;
+      match["items.core.factoryId"] = factoryId;
+    }
+    if (userIdScope) {
+      match["header.userId"] = { $in: userIdScope };
     }
 
     return this.orderModel.aggregate([
@@ -82,7 +101,7 @@ export class AnalyticsService {
                   $reduce: {
                     input: "$items",
                     initialValue: [],
-                    in: { $concatArrays: ["$$value", { $ifNull: ["$$this.technicalSnapshot.mainPieces", []] }] },
+                    in: { $concatArrays: ["$$value", { $ifNull: ["$$this.core.mainPieces", []] }] },
                   },
                 },
               },
@@ -102,7 +121,7 @@ export class AnalyticsService {
                 numPieces: { $first: "$numPieces" },
                 projectSqm: {
                   $sum: {
-                    $divide: [{ $multiply: [{ $ifNull: ["$pieces.measurements.length_mm", 0] }, { $ifNull: ["$pieces.measurements.width_mm", 0] }] }, 1000000],
+                    $divide: [{ $multiply: [{ $ifNull: ["$pieces.length_mm", 0] }, { $ifNull: ["$pieces.width_mm", 0] }] }, 1000000],
                   },
                 },
                 projectMl: {
@@ -129,43 +148,69 @@ export class AnalyticsService {
           ],
           materials: [
             { $unwind: "$items" },
-            { $unwind: "$items.technicalSnapshot.materials" },
+            { $unwind: "$items.core.mainPieces" },
             {
               $group: {
-                _id: "$items.technicalSnapshot.materials.materialId",
-                name: { $first: "$items.technicalSnapshot.materials.materialName" },
+                _id: { $toObjectId: "$items.core.mainPieces.materialId" },
                 count: { $sum: 1 },
               },
             },
-            { $project: { id: "$_id", name: { $ifNull: ["$name", "Desconocido"] }, count: 1, _id: 0 } },
+            {
+              $lookup: {
+                from: "materials",
+                localField: "_id",
+                foreignField: "_id",
+                pipeline: [{ $project: { name: 1 } }],
+                as: "materialInfo",
+              },
+            },
+            {
+              $project: {
+                id: { $toString: "$_id" },
+                name: { $ifNull: [{ $arrayElemAt: ["$materialInfo.name", 0] }, "Desconocido"] },
+                count: 1,
+                _id: 0,
+              },
+            },
           ],
           addons: [
             { $unwind: "$items" },
-            {
-              $project: {
-                allAddons: {
-                  $concatArrays: [
-                    { $ifNull: ["$items.technicalSnapshot.addons", []] },
-                    {
-                      $reduce: {
-                        input: { $ifNull: ["$items.technicalSnapshot.mainPieces", []] },
-                        initialValue: [],
-                        in: { $concatArrays: ["$$value", { $ifNull: ["$$this.appliedAddons", []] }] },
-                      },
-                    },
-                  ],
-                },
-              },
-            },
-            { $unwind: "$allAddons" },
+            { $unwind: "$items.core.mainPieces" },
+            { $unwind: "$items.core.mainPieces.appliedAddons" },
             {
               $group: {
-                _id: "$allAddons.code",
-                label: { $first: "$allAddons.name" },
+                _id: "$items.core.mainPieces.appliedAddons.code",
                 count: { $sum: 1 },
               },
             },
-            { $project: { code: "$_id", label: { $ifNull: ["$label", "$_id"] }, count: 1, _id: 0 } },
+            {
+              $lookup: {
+                from: "addons",
+                localField: "_id",
+                foreignField: "code",
+                pipeline: [{ $project: { name: 1 } }],
+                as: "addonInfo",
+              },
+            },
+            {
+              $project: {
+                code: "$_id",
+                label: { $ifNull: [{ $arrayElemAt: ["$addonInfo.name", 0] }, "$_id"] },
+                count: 1,
+                _id: 0,
+              },
+            },
+          ],
+          shapes: [
+            { $unwind: "$items" },
+            {
+              $group: {
+                _id: "$items.uiState.selectedShapeId",
+                count: { $sum: 1 },
+              },
+            },
+            { $match: { _id: { $ne: null } } },
+            { $project: { id: "$_id", label: "$_id", value: "$count", _id: 0 } },
           ],
           trends: [
             {
@@ -183,13 +228,17 @@ export class AnalyticsService {
     ]);
   }
 
-  private async aggregateDrafts(dateFilter: any, factoryId?: string) {
+  private async aggregateDrafts(dateFilter: any, factoryId?: string, userIdScope?: string[]) {
     const match: any = {};
     if (Object.keys(dateFilter).length > 0) {
       match.createdAt = dateFilter;
     }
-    // Si los drafts tuvieran factoryId, se añadiría aquí
-    // if (factoryId) match['configuration.factoryId'] = factoryId;
+    if (factoryId) {
+      match["core.factoryId"] = factoryId;
+    }
+    if (userIdScope) {
+      match.userId = { $in: userIdScope };
+    }
 
     return this.draftModel.aggregate([
       { $match: match },
@@ -199,8 +248,8 @@ export class AnalyticsService {
             {
               $project: {
                 totalPoints: "$currentPricePoints",
-                pieces: "$configuration.mainPieces",
-                numPieces: { $size: { $ifNull: ["$configuration.mainPieces", []] } },
+                pieces: "$core.mainPieces",
+                numPieces: { $size: { $ifNull: ["$core.mainPieces", []] } },
               },
             },
             {
@@ -213,7 +262,7 @@ export class AnalyticsService {
                 numPieces: { $first: "$numPieces" },
                 projectSqm: {
                   $sum: {
-                    $divide: [{ $multiply: [{ $ifNull: ["$pieces.measurements.length_mm", 0] }, { $ifNull: ["$pieces.measurements.width_mm", 0] }] }, 1000000],
+                    $divide: [{ $multiply: [{ $ifNull: ["$pieces.length_mm", 0] }, { $ifNull: ["$pieces.width_mm", 0] }] }, 1000000],
                   },
                 },
                 projectMl: {
@@ -239,47 +288,62 @@ export class AnalyticsService {
             },
           ],
           materials: [
+            { $unwind: { path: "$core.mainPieces", preserveNullAndEmptyArrays: false } },
             {
               $group: {
-                _id: "$configuration.wizardTempMaterial.materialId",
-                name: { $first: "$configuration.wizardTempMaterial.materialName" },
+                _id: { $toObjectId: "$core.mainPieces.materialId" },
                 count: { $sum: 1 },
               },
             },
-            { $match: { _id: { $ne: null } } },
-            { $project: { id: "$_id", name: { $ifNull: ["$name", "Desconocido"] }, count: 1, _id: 0 } },
-          ],
-          addons: [
+            {
+              $lookup: {
+                from: "materials",
+                localField: "_id",
+                foreignField: "_id",
+                pipeline: [{ $project: { name: 1 } }],
+                as: "materialInfo",
+              },
+            },
             {
               $project: {
-                allAddons: {
-                  $concatArrays: [
-                    { $ifNull: ["$configuration.globalAddons", []] },
-                    {
-                      $reduce: {
-                        input: { $ifNull: ["$configuration.mainPieces", []] },
-                        initialValue: [],
-                        in: { $concatArrays: ["$$value", { $ifNull: ["$$this.appliedAddons", []] }] },
-                      },
-                    },
-                  ],
-                },
+                id: { $toString: "$_id" },
+                name: { $ifNull: [{ $arrayElemAt: ["$materialInfo.name", 0] }, "Desconocido"] },
+                count: 1,
+                _id: 0,
               },
             },
-            { $unwind: "$allAddons" },
+          ],
+          addons: [
+            { $unwind: { path: "$core.mainPieces", preserveNullAndEmptyArrays: false } },
+            { $unwind: "$core.mainPieces.appliedAddons" },
             {
               $group: {
-                _id: "$allAddons.code",
-                label: { $first: "$allAddons.name" },
+                _id: "$core.mainPieces.appliedAddons.code",
                 count: { $sum: 1 },
               },
             },
-            { $project: { code: "$_id", label: { $ifNull: ["$label", "$_id"] }, count: 1, _id: 0 } },
+            {
+              $lookup: {
+                from: "addons",
+                localField: "_id",
+                foreignField: "code",
+                pipeline: [{ $project: { name: 1 } }],
+                as: "addonInfo",
+              },
+            },
+            {
+              $project: {
+                code: "$_id",
+                label: { $ifNull: [{ $arrayElemAt: ["$addonInfo.name", 0] }, "$_id"] },
+                count: 1,
+                _id: 0,
+              },
+            },
           ],
           shapes: [
             {
               $group: {
-                _id: "$configuration.selectedShapeId",
+                _id: "$uiState.selectedShapeId",
                 count: { $sum: 1 },
               },
             },
