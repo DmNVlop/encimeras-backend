@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards, UsePipes, ValidationPipe } from "@nestjs/common";
+import { Controller, Get, Query, Request, UseGuards, UsePipes, ValidationPipe } from "@nestjs/common";
 import { AnalyticsService } from "./analytics.service";
 import { AnalyticsQueryDto } from "./dto/analytics-query.dto";
 import { AnalyticsSummaryDto } from "./dto/analytics-summary.dto";
@@ -9,13 +9,13 @@ import { Role } from "../auth/enums/role.enum";
 
 @Controller("admin/analytics")
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN)
+@Roles(Role.ADMIN, Role.OWNER, Role.MANAGER, Role.SALES)
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 
   @Get("summary")
   @UsePipes(new ValidationPipe({ transform: true }))
-  async getSummary(@Query() query: AnalyticsQueryDto): Promise<AnalyticsSummaryDto> {
-    return this.analyticsService.getSummary(query);
+  async getSummary(@Query() query: AnalyticsQueryDto, @Request() req): Promise<AnalyticsSummaryDto> {
+    return this.analyticsService.getSummary(query, req.user);
   }
 }

@@ -81,7 +81,7 @@ export class OrdersService {
   }
 
   async findAllByFactory(factoryId: string, status?: string): Promise<any[]> {
-    const query: any = {};
+    const query: any = { "items.core.factoryId": factoryId };
     if (status) query["header.status"] = status;
 
     const orders = await this.orderModel.find(query).select("header").sort({ "header.orderDate": -1 }).lean();
@@ -131,13 +131,28 @@ export class OrdersService {
   }
 
   async findOneByFactory(id: string, factoryId: string): Promise<Order> {
-    const order = await this.orderModel.findById(id).lean();
+    const order = await this.orderModel.findOne({ _id: id, "items.core.factoryId": factoryId }).lean();
 
     if (!order) {
       throw new NotFoundException(`La orden con ID ${id} no existe o no tienes permiso para verla.`);
     }
 
     return order as unknown as Order;
+  }
+
+  /**
+   * Garantiza el invariante "1 Order = 1 factoryId": usa el factoryId del item si existe,
+   * si no cae al factoryId del usuario dueño de la orden. Si ninguno existe, no hay forma
+   * válida de asignar la orden a una fábrica.
+   */
+  private async resolveFactoryId(itemFactoryId: string | undefined, userId: string): Promise<string> {
+    if (itemFactoryId) return itemFactoryId;
+
+    const owner = await this.usersService.findOne(userId);
+    const userFactoryId = (owner as any).factoryId;
+    if (userFactoryId) return userFactoryId.toString();
+
+    throw new BadRequestException("No se pudo determinar la fábrica (factoryId) para esta orden. Verifica que el cliente o el usuario tengan una fábrica asignada.");
   }
 
   async createFromDraft(createOrderDto: CreateOrderDto, userId: string): Promise<Order> {
@@ -155,6 +170,10 @@ export class OrdersService {
 
     // 3. Generar ID Secuencial
     const orderNumber = await this.generateOrderNumber();
+
+    // 3a. Garantizar factoryId (invariante: 1 Order = 1 factoryId)
+    const resolvedFactoryId = await this.resolveFactoryId(draft.core.factoryId, userId);
+    draft.core.factoryId = resolvedFactoryId;
 
     // 3b. Resolver breakdown por pieza — usar el del draft si existe, recalcular si no
     let draftBreakdown: any[] = (draft as any).piecesBreakdown || [];
@@ -259,6 +278,16 @@ export class OrdersService {
 
     // 2. Generar ID Secuencial
     const orderNumber = await this.generateOrderNumber();
+
+    // 2a. Garantizar factoryId (invariante: 1 Order = 1 factoryId único para todos los items)
+    const resolvedFactoryId = await this.resolveFactoryId(cartData.items[0]?.core?.factoryId, userId);
+    for (const item of cartData.items) {
+      const itemFactoryId = item.core.factoryId || resolvedFactoryId;
+      if (itemFactoryId !== resolvedFactoryId) {
+        throw new BadRequestException("El carrito contiene ítems de fábricas distintas. Una orden solo puede pertenecer a una única fábrica.");
+      }
+      item.core.factoryId = resolvedFactoryId;
+    }
 
     // 3. Mapear cada CartItem a un OrderLineItem — snapshot inmutable completo
     const orderItems = cartData.items.map((item: any) => ({
