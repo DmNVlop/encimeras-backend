@@ -86,14 +86,6 @@ export class CustomersController {
     return this.customersService.update(id, updateCustomerDto, user.factoryId, user.userId, user.roles);
   }
 
-  @Delete(":id")
-  @Roles(Role.SALES) // nivel 2 mínimo
-  @ApiOperation({ summary: "Deactivate a customer (Soft Delete)" })
-  remove(@Param("id") id: string, @GetUser() user: any) {
-    if (!user.factoryId) throw new Error("Factory ID is required");
-    return this.customersService.remove(id, user.factoryId, user.userId, user.roles);
-  }
-
   @Post(":id/link/:userId")
   @Roles(Role.MANAGER) // nivel 3 mínimo → MANAGER, OWNER y ADMIN
   @ApiOperation({ summary: "Link customer to a platform user" })
@@ -111,6 +103,11 @@ export class CustomersController {
     return this.customersService.batchAssignSales(dto, factoryId);
   }
 
+  // IMPORTANTE: @Delete("batch") debe declararse ANTES que @Delete(":id") — Nest matchea
+  // rutas en orden de declaración, así que si ":id" va primero, "DELETE /customers/batch"
+  // matchea ahí con id="batch" y Mongoose tira CastError al castear "batch" a ObjectId
+  // (bug real detectado 2026-07-14: toda la UI de borrado individual/batch de Customers
+  // devolvía 500 por este orden).
   @Delete("batch")
   @Roles(Role.MANAGER) // nivel 3 mínimo
   @ApiOperation({ summary: "Deactivate multiple customers in batch (Soft Delete)" })
@@ -118,5 +115,13 @@ export class CustomersController {
   batchRemove(@Body() dto: BatchDeleteCustomersDto, @GetUser("factoryId") factoryId: string) {
     if (!factoryId) throw new Error("Factory ID is required");
     return this.customersService.batchRemove(dto.customerIds, factoryId);
+  }
+
+  @Delete(":id")
+  @Roles(Role.SALES) // nivel 2 mínimo
+  @ApiOperation({ summary: "Deactivate a customer (Soft Delete)" })
+  remove(@Param("id") id: string, @GetUser() user: any) {
+    if (!user.factoryId) throw new Error("Factory ID is required");
+    return this.customersService.remove(id, user.factoryId, user.userId, user.roles);
   }
 }
