@@ -5,10 +5,14 @@ import { Model } from "mongoose";
 import { CreateMaterialDto } from "./dto/create-material.dto";
 import { UpdateMaterialDto } from "./dto/update-material.dto";
 import { Material, MaterialDocument, PricingRecipe } from "./schemas/material.schema";
+import { ValidCombination, ValidCombinationDocument } from "src/valid-combinations/schemas/valid-combination.schema";
 
 @Injectable()
 export class MaterialsService {
-  constructor(@InjectModel(Material.name) private materialModel: Model<MaterialDocument>) {}
+  constructor(
+    @InjectModel(Material.name) private materialModel: Model<MaterialDocument>,
+    @InjectModel(ValidCombination.name) private validCombinationModel: Model<ValidCombinationDocument>,
+  ) {}
 
   async create(createMaterialDto: CreateMaterialDto): Promise<Material> {
     const createdMaterial = new this.materialModel(createMaterialDto);
@@ -107,6 +111,7 @@ export class MaterialsService {
     if (!deletedMaterial) {
       throw new NotFoundException(`Material with ID "${id}" not found`);
     }
+    await this.validCombinationModel.deleteMany({ materialId: id });
     return deletedMaterial;
   }
 
@@ -115,6 +120,7 @@ export class MaterialsService {
     if (result.deletedCount === 0) {
       throw new NotFoundException(`No materials found with the provided IDs.`);
     }
+    await this.validCombinationModel.deleteMany({ materialId: { $in: ids } });
     return { deletedCount: result.deletedCount };
   }
 
