@@ -90,10 +90,10 @@ export class Customer {
   @Prop()
   taxProfile: number;
 
-  @Prop({ type: Contact })
+  @Prop({ type: Contact, default: {} })
   contact: Contact;
 
-  @Prop({ type: Address })
+  @Prop({ type: Address, default: {} })
   address: Address;
 
   @Prop({ type: [MongooseSchema.Types.ObjectId], ref: "User", default: [] })

@@ -12,9 +12,18 @@ export class PriceConfigsService {
 
   // El CRUD se mantiene similar, pero ahora siempre incluye `productType`
 
-  create(createPriceConfigDto: CreatePriceConfigDto) {
+  async create(createPriceConfigDto: CreatePriceConfigDto) {
     const newPriceConfig = new this.priceConfigModel(createPriceConfigDto);
-    return newPriceConfig.save();
+    try {
+      return await newPriceConfig.save();
+    } catch (error) {
+      if (error.code === 11000) {
+        throw new ConflictException(
+          `Ya existe un precio configurado para la combinación "${createPriceConfigDto.combinationKey}" del tipo de producto "${createPriceConfigDto.productType}"`,
+        );
+      }
+      throw error;
+    }
   }
 
   findAll() {
