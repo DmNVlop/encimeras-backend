@@ -13,6 +13,9 @@ import { Roles } from "../auth/decorators/roles.decorator";
 import { Role } from "../auth/enums/role.enum";
 import { GetUser } from "../auth/decorators/get-user.decorator";
 import { DataScopeService } from "../shared/scope/data-scope.service";
+import { OptionalJwtAuthGuard } from "../auth/guards/optional-jwt-auth.guard";
+import { QuoteEventsService } from "../quote-events/quote-events.service";
+import { QuoteEventType } from "../quote-events/schemas/quote-event.schema";
 
 @ApiTags("Quotes")
 @Controller("quotes")
@@ -20,13 +23,28 @@ export class QuotesController {
   constructor(
     private readonly quotesService: QuotesService,
     private readonly dataScopeService: DataScopeService,
+    private readonly quoteEventsService: QuoteEventsService,
   ) {}
 
   @Post("calculate")
+  @UseGuards(OptionalJwtAuthGuard) // Público; si llega token, el cálculo queda trazado con su usuario
   @ApiOperation({ summary: "Calculate a quote price in real-time" })
   @UsePipes(ValidationPipe)
-  async calculatePrice(@Body() calculateQuoteDto: CalculateQuoteDto) {
+  async calculatePrice(@Body() calculateQuoteDto: CalculateQuoteDto, @GetUser() user: any) {
     const result = await this.quotesService.calculate(calculateQuoteDto);
+    if (calculateQuoteDto.quoteTraceId) {
+      this.quoteEventsService.record({
+        quoteTraceId: calculateQuoteDto.quoteTraceId,
+        type: QuoteEventType.CALCULATED,
+        userId: user?.userId,
+        factoryId: calculateQuoteDto.factoryId || user?.factoryId,
+        customerId: calculateQuoteDto.customerId,
+        totalPoints: result.finalTotalPoints,
+        originalPoints: result.totalPoints,
+        discountAmount: result.totalDiscount,
+        piecesCount: calculateQuoteDto.mainPieces?.length,
+      });
+    }
     return result;
   }
 

@@ -9,6 +9,8 @@ import { CartService } from "../cart/cart.service";
 import { UsersService } from "../users/users.service";
 import { QuotesService } from "../quotes/quotes.service";
 import { DataScope, DataScopeService } from "../shared/scope/data-scope.service";
+import { QuoteEventsService } from "../quote-events/quote-events.service";
+import { QuoteEventType } from "../quote-events/schemas/quote-event.schema";
 
 @Injectable()
 export class OrdersService {
@@ -20,6 +22,7 @@ export class OrdersService {
     private usersService: UsersService,
     private quotesService: QuotesService,
     private dataScopeService: DataScopeService,
+    private quoteEventsService: QuoteEventsService,
   ) {}
 
   /**
@@ -176,6 +179,7 @@ export class OrdersService {
         {
           type: "COUNTERTOP_PROJECT",
           cartItemName: draft.name || "Proyecto desde Borrador",
+          quoteTraceId: draft.quoteTraceId || QuoteEventsService.newTraceId(),
           core: draft.core,
           uiState: draft.uiState,
           originalPoints: (draft as any).originalPoints || draft.currentPricePoints,
@@ -196,6 +200,7 @@ export class OrdersService {
 
     // 🔥 Notificación en tiempo real (solo a quienes pueden ver la orden)
     await this.notifyOrder("new", savedOrder);
+    this.recordOrdered(savedOrder, userId, { draftId: draft._id.toString() });
 
     return savedOrder;
   }
@@ -243,6 +248,7 @@ export class OrdersService {
     const orderItems = cartData.items.map((item: any) => ({
       type: "COUNTERTOP_PROJECT",
       cartItemName: item.customName,
+      quoteTraceId: item.quoteTraceId || QuoteEventsService.newTraceId(),
       core: item.core,
       uiState: item.uiState,
       originalPoints: item.originalPoints || item.subtotalPoints,
@@ -278,8 +284,26 @@ export class OrdersService {
 
     // 7. Notificar
     await this.notifyOrder("new", savedOrder);
+    this.recordOrdered(savedOrder, userId, { cartItems: cartData.items });
 
     return savedOrder;
+  }
+
+  /** Trazabilidad: un evento ORDERED por presupuesto de la orden (enlaza con su draft/cart item de origen). */
+  private recordOrdered(order: Order, userId: string, origin: { draftId?: string; cartItems?: any[] }): void {
+    this.quoteEventsService.record(
+      order.items.map((item, index) => ({
+        ...QuoteEventsService.snapshotOf(item),
+        quoteTraceId: item.quoteTraceId!,
+        type: QuoteEventType.ORDERED,
+        userId,
+        customerId: item.core?.customerId ?? order.header.customerId,
+        draftId: origin.draftId ?? (origin.cartItems?.[index]?.draftId ? String(origin.cartItems[index].draftId) : undefined),
+        cartItemId: origin.cartItems?.[index]?.cartItemId,
+        orderId: order._id!.toString(),
+        orderNumber: order.header.orderNumber,
+      })),
+    );
   }
 
   // Helper para generar IDs tipo "ORD-2026-0045"

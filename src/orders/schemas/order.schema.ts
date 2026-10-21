@@ -44,6 +44,9 @@ export class OrderLineItem {
   @Prop({ required: true })
   cartItemName: string; // Ej: "Cocina de Juana", "Isla de Tomás"
 
+  @Prop({ index: true })
+  quoteTraceId?: string; // Id de trazabilidad del presupuesto de origen (draft → cart → order)
+
   @Prop({ type: MongooseSchema.Types.Mixed, required: true })
   core: {
     mainPieces: any[];

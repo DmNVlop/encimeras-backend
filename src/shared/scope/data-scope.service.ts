@@ -95,6 +95,16 @@ export class DataScopeService {
     return { createdBy: { $in: ids.map((id) => new Types.ObjectId(id)) } };
   }
 
+  /** Filtro sobre la colección `quote_events` (cada evento guarda userId, factoryId y customerId). */
+  toQuoteEventFilter(scope: DataScope): Record<string, any> {
+    if (scope.kind === "all") return {};
+    if (scope.kind === "factory") return { factoryId: scope.factoryId };
+
+    const or: Record<string, any>[] = [{ userId: { $in: scope.userIds } }];
+    if (scope.customerIds.length) or.push({ customerId: { $in: scope.customerIds } });
+    return { $or: or };
+  }
+
   /**
    * Salas de Socket.io a las que se une un usuario según su alcance. Todos entran en `user:<id>`
    * (eventos propios: checkout terminado o fallido); además `admin` o `factory:<id>`.

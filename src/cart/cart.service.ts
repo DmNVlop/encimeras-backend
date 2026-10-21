@@ -8,6 +8,8 @@ import { DraftsService } from "../drafts/drafts.service";
 import { MaterialsService } from "../materials/materials.service";
 import { DiscountEngineService } from "../discount-rules/discount-engine.service";
 import { CustomersService } from "../customers/customers.service";
+import { QuoteEventsService } from "../quote-events/quote-events.service";
+import { QuoteEventType } from "../quote-events/schemas/quote-event.schema";
 import { v4 as uuidv4 } from "uuid";
 import { InjectQueue } from "@nestjs/bullmq";
 import { Queue } from "bullmq";
@@ -21,6 +23,7 @@ export class CartService {
     private readonly materialsService: MaterialsService,
     private readonly discountEngineService: DiscountEngineService,
     private readonly customersService: CustomersService,
+    private readonly quoteEventsService: QuoteEventsService,
     @InjectQueue("cart") private cartQueue: Queue,
   ) {}
 
@@ -94,6 +97,7 @@ export class CartService {
 
     const cartItem: any = {
       cartItemId: uuidv4(),
+      quoteTraceId: addToCartDto.quoteTraceId || uuidv4(),
       customName: addToCartDto.customName,
       core: addToCartDto.core,
       uiState: addToCartDto.uiState,
@@ -109,6 +113,7 @@ export class CartService {
     await this.recalculateCartTotals(activeCart as any);
 
     await activeCart.save();
+    this.recordCartAdded(userId, [cartItem]);
     return this.getOrCreateCart(userId); // Devolvemos hidratado
   }
 
@@ -151,6 +156,8 @@ export class CartService {
     if (itemIndex === -1) throw new NotFoundException("Ítem no encontrado en el carrito");
 
     if (updateDto.customName) cart.items[itemIndex].customName = updateDto.customName;
+    // Ítems anteriores a la trazabilidad: el id se asigna una vez y ya no cambia
+    if (!cart.items[itemIndex].quoteTraceId) cart.items[itemIndex].quoteTraceId = uuidv4();
 
     if (updateDto.core) {
       cart.items[itemIndex].core = {
@@ -195,8 +202,10 @@ export class CartService {
     const drafts: any[] = [];
 
     for (const item of cart.items) {
+      if (!item.quoteTraceId) item.quoteTraceId = uuidv4();
       const draftData: any = {
         name: item.customName,
+        quoteTraceId: item.quoteTraceId,
         core: item.core,
         uiState: item.uiState,
         currentPricePoints: item.subtotalPoints,
@@ -237,6 +246,7 @@ export class CartService {
       activeCart.items = [];
     }
 
+    const importedItems: any[] = [];
     for (const draft of drafts) {
       const draftIdStr = (draft as any)._id.toString();
 
@@ -260,6 +270,7 @@ export class CartService {
 
       const cartItem: any = {
         cartItemId: uuidv4(),
+        quoteTraceId: draft.quoteTraceId || uuidv4(),
         customName: draft.name || "Borrador importado",
         core: draft.core,
         uiState: draft.uiState,
@@ -271,11 +282,27 @@ export class CartService {
       };
 
       activeCart.items.push(cartItem);
+      importedItems.push(cartItem);
     }
 
     await this.recalculateCartTotals(activeCart as any);
     await activeCart.save();
+    this.recordCartAdded(userId, importedItems);
     return this.getOrCreateCart(userId);
+  }
+
+  /** Trazabilidad: un evento CART_ADDED por presupuesto que entra en el carrito (efecto secundario, nunca rompe). */
+  private recordCartAdded(userId: string, items: any[]): void {
+    this.quoteEventsService.record(
+      items.map((item) => ({
+        ...QuoteEventsService.snapshotOf(item),
+        quoteTraceId: item.quoteTraceId,
+        type: QuoteEventType.CART_ADDED,
+        userId,
+        draftId: item.draftId ? String(item.draftId) : undefined,
+        cartItemId: item.cartItemId,
+      })),
+    );
   }
 
   /**

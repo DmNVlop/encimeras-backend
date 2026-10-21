@@ -11,6 +11,7 @@ import { MainPiecesModule } from "src/main-pieces/main-pieces.module";
 import { DiscountRulesModule } from "src/discount-rules/discount-rules.module";
 import { CustomersModule } from "src/customers/customers.module";
 import { DataScopeModule } from "../shared/scope/data-scope.module";
+import { QuoteEventsModule } from "../quote-events/quote-events.module";
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { DataScopeModule } from "../shared/scope/data-scope.module";
     DiscountRulesModule,
     CustomersModule,
     DataScopeModule,
+    QuoteEventsModule,
     MongooseModule.forFeature([{ name: Quote.name, schema: QuoteSchema }]),
   ],
   controllers: [QuotesController],

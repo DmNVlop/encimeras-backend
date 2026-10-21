@@ -5,7 +5,8 @@ import { Draft } from "./schemas/draft.schema";
 import { GlobalSettingsService } from "../settings/global-settings.service";
 import { QuotesService } from "src/quotes/quotes.service";
 import { CreateDraftDto } from "./dto/create-draft.dto";
-// Importa tu servicio real de precios aquí
+import { QuoteEventsService } from "../quote-events/quote-events.service";
+import { QuoteEventType } from "../quote-events/schemas/quote-event.schema";
 
 @Injectable()
 export class DraftsService {
@@ -14,6 +15,7 @@ export class DraftsService {
     private settingsService: GlobalSettingsService,
     // Inyectamos el motor de precios existente
     private pricingService: QuotesService,
+    private quoteEventsService: QuoteEventsService,
   ) {}
 
   // --- CREAR / GUARDAR ---
@@ -44,6 +46,7 @@ export class DraftsService {
 
     const newDraft = new this.draftModel({
       ...createDraftDto,
+      quoteTraceId: createDraftDto.quoteTraceId || QuoteEventsService.newTraceId(),
       currentPricePoints: finalCurrentPrice,
       originalPoints: finalOriginalPrice ?? finalCurrentPrice,
       discountAmount: finalDiscount ?? 0,
@@ -53,7 +56,19 @@ export class DraftsService {
       isConverted: false,
     });
 
-    return newDraft.save();
+    const saved = await newDraft.save();
+    this.recordDraftSaved(saved, userId);
+    return saved;
+  }
+
+  private recordDraftSaved(draft: Draft, userId?: string): void {
+    this.quoteEventsService.record({
+      ...QuoteEventsService.snapshotOf(draft),
+      quoteTraceId: draft.quoteTraceId!,
+      type: QuoteEventType.DRAFT_SAVED,
+      userId,
+      draftId: String(draft._id),
+    });
   }
 
   // --- RECUPERAR CON LÓGICA DE NEGOCIO ---
@@ -137,10 +152,17 @@ export class DraftsService {
       finalDiscount = Number.isFinite(calculation.totalDiscount) ? calculation.totalDiscount : 0;
     }
 
+    // El id de trazabilidad de un borrador no cambia: se conserva el guardado y solo se asigna si no tenía
+    const existing = await this.draftModel.findOne({ _id: id, userId }).select("quoteTraceId").lean();
+    if (!existing) {
+      throw new NotFoundException(`No se pudo encontrar el borrador con ID ${id} para actualizar.`);
+    }
+
     const updatedDraft = await this.draftModel.findOneAndUpdate(
       { _id: id, userId },
       {
         ...updateDraftDto,
+        quoteTraceId: existing.quoteTraceId || updateDraftDto.quoteTraceId || QuoteEventsService.newTraceId(),
         currentPricePoints: finalCurrentPrice,
         originalPoints: finalOriginalPrice ?? finalCurrentPrice,
         discountAmount: finalDiscount ?? 0,
@@ -154,6 +176,7 @@ export class DraftsService {
       throw new NotFoundException(`No se pudo encontrar el borrador con ID ${id} para actualizar.`);
     }
 
+    this.recordDraftSaved(updatedDraft, userId);
     return updatedDraft;
   }
 

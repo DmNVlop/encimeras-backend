@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsNumber, IsArray, IsObject, ValidateNested } from "class-validator";
+import { IsString, IsNotEmpty, IsOptional, IsNumber, IsArray, IsObject, IsUUID, ValidateNested } from "class-validator";
 import { Type } from "class-transformer";
 import { CoreEntityDto } from "./core-entity.dto";
 
@@ -25,6 +25,11 @@ export class AddToCartDto {
   @IsString()
   @IsOptional()
   draftId?: string;
+
+  // Id de trazabilidad generado en el frontend; si falta, lo genera el backend
+  @IsUUID()
+  @IsOptional()
+  quoteTraceId?: string;
 }
 
 export class UpdateCartItemDto {
