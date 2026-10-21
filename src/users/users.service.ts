@@ -7,6 +7,7 @@ import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { Role, ROLE_HIERARCHY, getMaxRoleLevel } from "../auth/enums/role.enum";
 import { RoleHierarchyService } from "../auth/services/role-hierarchy.service";
+import { generateTemporaryPassword } from "./utils/password.util";
 
 @Injectable()
 export class UsersService {
@@ -15,8 +16,8 @@ export class UsersService {
     private readonly roleHierarchy: RoleHierarchyService,
   ) {}
 
-  async create(createUserDto: CreateUserDto, currentUserRoles: Role[], currentUserId: string, currentUserFactoryId?: string): Promise<User> {
-    const { username, password, roles = [Role.USER], factoryId, ownerId } = createUserDto;
+  async create(createUserDto: CreateUserDto, currentUserRoles: Role[], currentUserId: string, currentUserFactoryId?: string) {
+    const { username, password, generatePassword, roles = [Role.USER], factoryId, ownerId, ...profile } = createUserDto;
 
     const existingUser = await this.userModel.findOne({ username });
     if (existingUser) {
@@ -83,11 +84,13 @@ export class UsersService {
       }
     }
 
+    const plainPassword = generatePassword ? generateTemporaryPassword() : (password as string);
     const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    const hashedPassword = await bcrypt.hash(plainPassword, salt);
 
     const newUser = new this.userModel({
-      ...createUserDto,
+      ...profile,
+      username,
       roles,
       factoryId: isFactoryScoped ? (factoryId ?? currentUserFactoryId) : factoryId,
       ownerId: finalOwnerId,
@@ -96,7 +99,12 @@ export class UsersService {
       password: hashedPassword,
     });
 
-    return newUser.save();
+    const saved = await newUser.save();
+    // Nunca devolver el hash al cliente
+    const created = saved.toObject();
+    delete (created as { password?: string }).password;
+    // `generatedPassword` se devuelve una sola vez: no se guarda en claro en ningún sitio
+    return generatePassword ? { ...created, generatedPassword: plainPassword } : created;
   }
 
   async findAll(role?: string): Promise<User[]> {

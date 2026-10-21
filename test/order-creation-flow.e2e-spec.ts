@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { Test, TestingModule } from "@nestjs/testing";
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { getModelToken } from "@nestjs/mongoose";
@@ -42,7 +43,8 @@ describe("Order creation flow (e2e)", () => {
 
   const TEST_TAG = `E2E_ORDER_FLOW_${Date.now()}`;
   const testUsername = `${TEST_TAG}_user`;
-  const testPassword = "Test1234!";
+  // Aleatoria por ejecución: ninguna credencial fija en el repo
+  const testPassword = `T-${randomUUID()}`;
   const testFactoryId = new Types.ObjectId().toString();
 
   let testUserId: string;
