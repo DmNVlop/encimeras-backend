@@ -4,15 +4,23 @@ import { CreateDraftDto } from "./dto/create-draft.dto";
 import type { Response } from "express";
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { GetUser } from "src/auth/decorators/get-user.decorator";
+import { DataScopeService } from "src/shared/scope/data-scope.service";
 
 @Controller("drafts")
 export class DraftsController {
-  constructor(private readonly draftsService: DraftsService) {}
+  constructor(
+    private readonly draftsService: DraftsService,
+    private readonly dataScopeService: DataScopeService,
+  ) {}
+
+  private async scopeFilter(user: any): Promise<Record<string, any>> {
+    return this.dataScopeService.toDraftFilter(await this.dataScopeService.resolve(user));
+  }
 
   @Get()
   @UseGuards(JwtAuthGuard)
   async getAllActive(@GetUser() user: any) {
-    return this.draftsService.findAllActive(user.userId);
+    return this.draftsService.findAllActive(user.userId, await this.scopeFilter(user));
   }
 
   @Post()
@@ -29,7 +37,7 @@ export class DraftsController {
   @Get(":id")
   @UseGuards(JwtAuthGuard)
   async getOne(@Param("id") id: string, @Res() res: Response, @GetUser() user: any) {
-    const result = await this.draftsService.findOne(id, user.userId);
+    const result = await this.draftsService.findOne(id, user.userId, await this.scopeFilter(user));
 
     // Si el estatus es EXPIRED_RECALCULATED, enviamos un código 200
     // pero con un objeto que el frontend debe interpretar para mostrar el aviso
@@ -38,6 +46,7 @@ export class DraftsController {
       message: result.message || "Borrador recuperado",
       data: result.data, // El documento del borrador
       newPrice: result.newPrice || null,
+      isOwn: result.isOwn, // false = borrador ajeno en alcance: el FE lo abre como copia
     });
   }
 

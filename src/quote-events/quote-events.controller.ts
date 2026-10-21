@@ -8,6 +8,7 @@ import { GetUser } from "../auth/decorators/get-user.decorator";
 import { DataScopeService } from "../shared/scope/data-scope.service";
 import { QuoteEventsService } from "./quote-events.service";
 import { PdfDownloadDto } from "./dto/pdf-download.dto";
+import { QuoteEventsBackfillService } from "./quote-events-backfill.service";
 
 @ApiTags("Quote Events")
 @ApiBearerAuth()
@@ -16,6 +17,7 @@ export class QuoteEventsController {
   constructor(
     private readonly quoteEventsService: QuoteEventsService,
     private readonly dataScopeService: DataScopeService,
+    private readonly backfillService: QuoteEventsBackfillService,
   ) {}
 
   @Post("pdf-download")
@@ -31,6 +33,14 @@ export class QuoteEventsController {
   async findTimeline(@Query("quoteTraceId") quoteTraceId: string, @GetUser() user: any) {
     if (!quoteTraceId) throw new BadRequestException("quoteTraceId es obligatorio");
     return this.quoteEventsService.findTimeline(quoteTraceId, await this.dataScopeService.resolve(user));
+  }
+
+  @Post("backfill")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: "Reconstruye ORDERED/DRAFT_SAVED de datos anteriores a la trazabilidad (solo ADMIN; simulación salvo dryRun=false)" })
+  backfill(@Query("dryRun") dryRun: string, @GetUser() user: any) {
+    return this.backfillService.run(user.userId, dryRun !== "false");
   }
 
   @Delete(":quoteTraceId")

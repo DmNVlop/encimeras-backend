@@ -151,20 +151,22 @@ export class QuoteEventsService {
     }));
   }
 
-  /** Inserta en una sola petición; completa el factoryId con el del usuario si el presupuesto no lo trae. */
+  /** Completa el factoryId con el del usuario si el presupuesto no lo trae (sin él, el alcance de fábrica no lo ve). */
+  async fillFactoryIds(events: QuoteEventInput[]): Promise<void> {
+    const missingFactory = [...new Set(events.filter((e) => !e.factoryId && e.userId && Types.ObjectId.isValid(e.userId)).map((e) => String(e.userId)))];
+    if (!missingFactory.length) return;
+    const users = await this.userModel.find({ _id: { $in: missingFactory } }).select("factoryId").lean();
+    const factoryByUser = new Map(users.map((u) => [u._id.toString(), u.factoryId ? String(u.factoryId) : undefined]));
+    events.forEach((e) => {
+      if (!e.factoryId && e.userId) e.factoryId = factoryByUser.get(String(e.userId));
+    });
+  }
+
+  /** Inserta en una sola petición. */
   private async persist(events: QuoteEventInput[]): Promise<void> {
     const valid = events.filter((e) => e.quoteTraceId);
     if (!valid.length) return;
-
-    const missingFactory = [...new Set(valid.filter((e) => !e.factoryId && e.userId && Types.ObjectId.isValid(e.userId)).map((e) => String(e.userId)))];
-    if (missingFactory.length) {
-      const users = await this.userModel.find({ _id: { $in: missingFactory } }).select("factoryId").lean();
-      const factoryByUser = new Map(users.map((u) => [u._id.toString(), u.factoryId ? String(u.factoryId) : undefined]));
-      valid.forEach((e) => {
-        if (!e.factoryId && e.userId) e.factoryId = factoryByUser.get(String(e.userId));
-      });
-    }
-
+    await this.fillFactoryIds(valid);
     await this.quoteEventModel.insertMany(valid);
   }
 }

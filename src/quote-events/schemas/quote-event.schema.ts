@@ -9,6 +9,9 @@ export enum QuoteEventType {
   ORDERED = "ORDERED",
 }
 
+/** `source` de los eventos reconstruidos desde datos anteriores a la trazabilidad (no miden cálculos ni PDF). */
+export const BACKFILL_SOURCE = "backfill";
+
 /**
  * Evento de trazabilidad de un presupuesto (append-only: nunca se edita ni se borra).
  * `quoteTraceId` une todos los eventos del mismo presupuesto a lo largo de draft → cart → order.
@@ -66,3 +69,4 @@ export const QuoteEventSchema = SchemaFactory.createForClass(QuoteEvent);
 QuoteEventSchema.index({ quoteTraceId: 1, createdAt: 1 });
 QuoteEventSchema.index({ factoryId: 1, createdAt: -1 });
 QuoteEventSchema.index({ userId: 1, createdAt: -1 });
+QuoteEventSchema.index({ customerId: 1, createdAt: -1 });
