@@ -1,9 +1,11 @@
 /**
  * Socket.io autenticado y con salas por alcance (EventsGateway + DataScopeService.roomsFor).
  * Usa el WebSocket nativo de Node (protocolo Engine.io v4 / Socket.io v5), sin dependencias.
- * No escribe: el PATCH reenvía el estado que la orden ya tiene, solo para disparar `orders:update`.
+ * Escribe: 1 orden de prueba «ZZ Prueba socket <marca>» del USER (PENDING → REVIEWED por el OWNER para disparar
+ * `orders:update`), purgada en el `finally` con su draft y su traza.
  */
 const { API, call, loginAs, assertFactory, adminHeaders, check, done } = require('../_lib/env');
+const { findPricedPiece, createTestOrder, purgeTestOrder } = require('../_lib/fixtures');
 
 const WS_URL = API.replace(/^http/, 'ws') + '/socket.io/?EIO=4&transport=websocket';
 const TIMEOUT = 5000; // tope de seguridad; cada espera termina en cuanto llega el paquete esperado
@@ -38,22 +40,29 @@ const tokenOf = (headers) => headers.Authorization.replace(/^Bearer\s+/i, '');
   check('socket sin token → desconectado por el servidor', !!kicked, kicked || 'sin paquete 41');
   anon.close();
 
-  // 2. OWNER recibe `orders:update` de una orden de su fábrica.
+  // 2. OWNER recibe `orders:update` de una orden de su fábrica (orden de prueba del USER).
   const owner = await loginAs('OWNER');
-  if (!check('login OWNER', !!owner)) return done();
-  const list = await call('GET', '/orders', undefined, owner);
-  const order = (list.body || [])[0];
-  if (!order) { console.log('OMITIDO OWNER recibe orders:update — su fábrica no tiene órdenes'); return done(); }
+  const user = await loginAs('USER');
+  if (!check('login OWNER', !!owner) || !check('login USER', !!user)) return done();
+  const piece = await findPricedPiece(admin);
+  if (!piece) { console.log('OMITIDO OWNER recibe orders:update — no hay material con receta ENCIMERA y precio configurado'); return done(); }
 
+  const created = await createTestOrder(user, piece, 'socket');
   const sock = openSocket(tokenOf(owner));
-  const connected = await sock.waitFor((m) => m.startsWith('40'));
-  check('socket OWNER con token → conectado', !!connected, connected ? '' : 'sin paquete 40');
-  if (connected) {
-    const update = sock.waitFor((m) => m.startsWith('42') && m.includes('"orders:update"') && m.includes(String(order._id)));
-    const p = await call('PATCH', `/orders/${order._id}/status`, { status: order.header.status }, owner);
-    check('PATCH estado (mismo valor) → 200', p.status === 200, `status ${p.status}`);
-    check('OWNER recibe orders:update de su orden', !!(await update));
+  try {
+    if (!check('USER crea orden de prueba', !created.error, created.error)) return;
+    const connected = await sock.waitFor((m) => m.startsWith('40'));
+    check('socket OWNER con token → conectado', !!connected, connected ? '' : 'sin paquete 40');
+    if (connected) {
+      const update = sock.waitFor((m) => m.startsWith('42') && m.includes('"orders:update"') && m.includes(String(created.orderId)));
+      const p = await call('PATCH', `/orders/${created.orderId}/status`, { status: 'REVIEWED' }, owner);
+      check('OWNER PATCH PENDING → REVIEWED → 200', p.status === 200, `status ${p.status}`);
+      check('OWNER recibe orders:update de su orden', !!(await update));
+    }
+  } finally {
+    sock.close();
+    const purged = await purgeTestOrder(admin, user, created);
+    check('limpieza: orden de prueba purgada', purged === 200, `status ${purged}`);
+    done();
   }
-  sock.close();
-  done();
 })().catch((e) => { console.log(e.message.startsWith('ABORTO') ? e.message : `FALLO ${e.message}`); process.exit(1); });

@@ -1,6 +1,6 @@
 /**
  * Alcance de datos por rol (DataScopeService) en órdenes, analytics y quotes.
- * No escribe: el único PATCH reenvía el estado que la orden ya tiene, y el DELETE de quote usa un id inexistente.
+ * No escribe: el único PATCH es sobre una orden ajena (404 antes de validar la transición) y el DELETE de quote usa un id inexistente.
  * Las comprobaciones cruzadas necesitan órdenes fuera del alcance de cada rol; si no las hay, se marcan OMITIDO.
  */
 const { env, call, loginAs, assertFactory, adminHeaders, check, done } = require('../_lib/env');

@@ -1,9 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { Model, Types } from "mongoose";
+import { Model } from "mongoose";
 import { BACKFILL_SOURCE, QuoteEvent, QuoteEventType } from "../quote-events/schemas/quote-event.schema";
-import { User } from "../users/schemas/users.schema";
-import { Customer } from "../customers/schemas/customer.schema";
+import { DisplayNamesService } from "../shared/display-names/display-names.service";
 import { Order } from "../orders/schemas/order.schema";
 import { Draft } from "../drafts/schemas/draft.schema";
 import { DataScope, DataScopeService, ScopeUser } from "../shared/scope/data-scope.service";
@@ -38,11 +37,10 @@ const lastNonNull = (field: string) => ({ $arrayElemAt: [nonNull(field), -1] });
 export class ActivityService {
   constructor(
     @InjectModel(QuoteEvent.name) private quoteEventModel: Model<QuoteEvent>,
-    @InjectModel(User.name) private userModel: Model<User>,
-    @InjectModel(Customer.name) private customerModel: Model<Customer>,
     @InjectModel(Order.name) private orderModel: Model<Order>,
     @InjectModel(Draft.name) private draftModel: Model<Draft>,
     private dataScopeService: DataScopeService,
+    private displayNames: DisplayNamesService,
   ) {}
 
   async getActivity(query: ActivityQueryDto, user: ScopeUser): Promise<ActivityDto> {
@@ -125,40 +123,20 @@ export class ActivityService {
   }
 
   private async withUserNames(rows: any[]): Promise<ActivityRowDto[]> {
-    const ids = rows.map((r) => r._id).filter((id) => id && Types.ObjectId.isValid(id));
-    const users = await this.userModel.find({ _id: { $in: ids } }).select("name username email").lean();
-    const byId = new Map(users.map((u) => [u._id.toString(), u]));
+    const names = await this.displayNames.userNames(rows.map((r) => r._id));
     return rows.map((r) => {
-      const u = r._id ? byId.get(String(r._id)) : undefined;
-      const name = r._id ? u?.name || u?.username || "Usuario eliminado" : "Público (sin sesión)";
+      const u = r._id ? names.get(String(r._id)) : undefined;
+      const name = r._id ? u?.name || "Usuario eliminado" : "Público (sin sesión)";
       return { ...this.toFunnel(r), id: r._id ?? null, name, email: u?.email };
     });
   }
 
   /** Solo clientes reales: en drafts antiguos `core.customerId` puede ser un userId y se descarta. */
   private async withCustomerNames(rows: any[]): Promise<ActivityRowDto[]> {
-    const names = await this.customerNames(rows.map((r) => r._id));
+    const names = await this.displayNames.customerNames(rows.map((r) => r._id));
     return rows
       .filter((r) => names.has(String(r._id)))
       .map((r) => ({ ...this.toFunnel(r), id: String(r._id), ...names.get(String(r._id))! }));
-  }
-
-  private async customerNames(ids: string[]): Promise<Map<string, { name: string; email?: string }>> {
-    const valid = [...new Set(ids.filter((id) => id && Types.ObjectId.isValid(id)).map(String))];
-    if (!valid.length) return new Map();
-    const customers = await this.customerModel
-      .find({ _id: { $in: valid } })
-      .select("commercialName officialName firstName lastName contact.email")
-      .lean();
-    return new Map(
-      customers.map((c: any) => [
-        c._id.toString(),
-        {
-          name: c.commercialName || c.officialName || [c.firstName, c.lastName].filter(Boolean).join(" ") || c.contact?.email || "Cliente sin nombre",
-          email: c.contact?.email,
-        },
-      ]),
-    );
   }
 
   private async portalOrders(scope: DataScope): Promise<PortalSummaryDto["orders"]> {
@@ -180,7 +158,7 @@ export class ActivityService {
       this.orderModel.find(filter).sort({ "header.orderDate": -1 }).limit(RECENT_LIMIT).select("header").lean(),
     ]);
 
-    const names = await this.customerNames(recent.map((o: any) => o.header.customerId));
+    const names = await this.displayNames.customerNames(recent.map((o: any) => o.header.customerId));
     const sum = (key: string) => statusRows.reduce((acc, r) => acc + (r[key] || 0), 0);
     return {
       total: sum("count"),

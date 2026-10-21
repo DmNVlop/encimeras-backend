@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, Inject, forwardRef } from "@nestjs/common";
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException, ConflictException, Logger, Inject, forwardRef } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { HydratedDocument, Model } from "mongoose";
 import { Order } from "./schemas/order.schema";
@@ -11,9 +11,27 @@ import { QuotesService } from "../quotes/quotes.service";
 import { DataScope, DataScopeService } from "../shared/scope/data-scope.service";
 import { QuoteEventsService } from "../quote-events/quote-events.service";
 import { QuoteEventType } from "../quote-events/schemas/quote-event.schema";
+import { UpdateOrderStatusDto } from "./dto/update-order-status.dto";
+import { OrderSearchQueryDto } from "./dto/order-search-query.dto";
+import { DisplayNamesService } from "../shared/display-names/display-names.service";
+import {
+  ORDER_TRANSITIONS,
+  NOTE_REQUIRED_STATUSES,
+  OrderStatus,
+  StatusActor,
+  allowedTargets,
+  canManageAllStatuses,
+  lastUndoableChange,
+  requiresNote,
+} from "./order-status-flow";
+
+/** Prefijo de las órdenes que crean las baterías de prueba: las únicas que se pueden purgar. */
+export const TEST_ORDER_PREFIX = "ZZ Prueba";
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     @InjectModel(Order.name) private orderModel: Model<Order>,
     private draftsService: DraftsService,
@@ -23,6 +41,7 @@ export class OrdersService {
     private quotesService: QuotesService,
     private dataScopeService: DataScopeService,
     private quoteEventsService: QuoteEventsService,
+    private displayNames: DisplayNamesService,
   ) {}
 
   /**
@@ -205,22 +224,171 @@ export class OrdersService {
     return savedOrder;
   }
 
-  async updateStatus(id: string, status: string, scope: DataScope): Promise<Order> {
+  /**
+   * Bandeja del backoffice (y futura app de puesto): paginada en servidor, con contadores por estado
+   * (sobre el alcance + texto, sin el filtro de estado), nombres resueltos y acciones de estado por fila.
+   */
+  async search(query: OrderSearchQueryDto, scope: DataScope, actor: StatusActor) {
+    const page = query.page ?? 0;
+    const limit = query.limit ?? 25;
+    const and: Record<string, any>[] = [this.dataScopeService.toOrderFilter(scope)];
+
+    const text = query.q?.trim();
+    if (text) {
+      const rx = new RegExp(DisplayNamesService.escapeRegex(text), "i");
+      const { userIds, customerIds } = await this.displayNames.findIdsByName(text);
+      const or: Record<string, any>[] = [{ "header.orderNumber": rx }, { "header.orderName": rx }];
+      if (userIds.length) or.push({ "header.userId": { $in: userIds } });
+      if (customerIds.length) or.push({ "header.customerId": { $in: customerIds } });
+      and.push({ $or: or });
+    }
+
+    const base = { $and: and };
+    const filter = query.status?.length ? { $and: [...and, { "header.status": { $in: query.status } }] } : base;
+
+    const [orders, total, countRows] = await Promise.all([
+      this.orderModel.find(filter).sort({ "header.orderDate": -1, _id: -1 }).skip(page * limit).limit(limit).select("header").lean(),
+      this.orderModel.countDocuments(filter),
+      this.orderModel.aggregate([{ $match: base }, { $group: { _id: "$header.status", count: { $sum: 1 } } }]),
+    ]);
+
+    const [users, customers] = await Promise.all([
+      this.displayNames.userNames(orders.map((o: any) => o.header.userId)),
+      this.displayNames.customerNames(orders.map((o: any) => o.header.customerId)),
+    ]);
+
+    return {
+      items: orders.map((o: any) => {
+        const { statusHistory, ...header } = o.header;
+        return {
+          _id: o._id.toString(),
+          ...header,
+          userName: users.get(String(header.userId))?.name,
+          customerName: customers.get(String(header.customerId))?.name,
+          lastStatusChangeAt: statusHistory?.length ? statusHistory[statusHistory.length - 1].at : header.orderDate,
+          statusActions: this.statusActionsFor(o.header, actor),
+        };
+      }),
+      total,
+      page,
+      limit,
+      counts: Object.fromEntries(countRows.map((r) => [r._id, r.count])),
+    };
+  }
+
+  /** Detalle + acciones de estado que el usuario puede hacer sobre esa orden (el FE no replica permisos) + nombres (BFF). */
+  async findOneWithActions(id: string, scope: DataScope, actor: StatusActor): Promise<any> {
+    const order: any = await this.findOne(id, scope);
+    const [users, customers] = await Promise.all([
+      this.displayNames.userNames([order.header.userId]),
+      this.displayNames.customerNames([order.header.customerId]),
+    ]);
+    const user = users.get(String(order.header.userId));
+    const customer = customers.get(String(order.header.customerId));
+    return {
+      ...order,
+      display: { userName: user?.name, userEmail: user?.email, customerName: customer?.name, customerEmail: customer?.email },
+      statusActions: this.statusActionsFor(order.header, actor),
+    };
+  }
+
+  private statusActionsFor(header: any, actor: StatusActor) {
+    const undoable = lastUndoableChange(header.statusHistory);
+    return {
+      targets: allowedTargets(header.status, header.userId, actor),
+      noteRequired: NOTE_REQUIRED_STATUSES,
+      canUndo: canManageAllStatuses(actor.roles) && !!undoable && undoable.to === header.status,
+      undoTo: undoable?.from ?? null,
+    };
+  }
+
+  /**
+   * Cambio de estado validado contra el flujo (order-status-flow.ts): fuera de alcance ⇒ 404,
+   * transición inexistente ⇒ 400, sin permiso para esa transición ⇒ 403, falta nota obligatoria ⇒ 400.
+   * Escritura atómica condicionada al estado leído: si otro lo cambió entre medias ⇒ 409.
+   */
+  async changeStatus(id: string, dto: UpdateOrderStatusDto, actor: StatusActor & { name?: string; username?: string }, scope: DataScope): Promise<Order> {
+    const order: any = await this.findOne(id, scope);
+    const from = order.header.status;
+    const to = dto.status;
+    const note = dto.note?.trim() || undefined;
+
+    if (!(ORDER_TRANSITIONS[from as OrderStatus] ?? []).includes(to as OrderStatus)) {
+      const valid = ORDER_TRANSITIONS[from as OrderStatus] ?? [];
+      throw new BadRequestException(`Transición no válida: ${from} → ${to}. Desde ${from} solo se puede pasar a: ${valid.join(", ") || "ninguno (estado final)"}`);
+    }
+    if (!allowedTargets(from, order.header.userId, actor).includes(to as OrderStatus)) {
+      throw new ForbiddenException(`Tu rol no permite pasar la orden de ${from} a ${to}`);
+    }
+    if (requiresNote(to) && !note) {
+      throw new BadRequestException(`La nota es obligatoria para pasar a ${to}`);
+    }
+
+    return this.applyStatusChange(order, { from, to, note }, actor, scope);
+  }
+
+  /** «Deshacer último cambio» (OWNER o superior, nota obligatoria): añade una entrada `undo` que revierte el último cambio vigente. */
+  async undoLastStatus(id: string, note: string, actor: StatusActor & { name?: string; username?: string }, scope: DataScope): Promise<Order> {
+    if (!canManageAllStatuses(actor.roles)) {
+      throw new ForbiddenException("Solo OWNER o ADMIN pueden deshacer cambios de estado");
+    }
+    const order: any = await this.findOne(id, scope);
+    const last = lastUndoableChange(order.header.statusHistory);
+    if (!last) throw new BadRequestException("Esta orden no tiene cambios de estado que deshacer");
+    if (last.to !== order.header.status) {
+      throw new ConflictException(`El historial no coincide con el estado actual (${order.header.status}); no se puede deshacer`);
+    }
+
+    return this.applyStatusChange(order, { from: order.header.status, to: last.from, note: note.trim(), undo: true }, actor, scope);
+  }
+
+  private async applyStatusChange(
+    order: any,
+    change: { from: string; to: string; note?: string; undo?: boolean },
+    actor: StatusActor & { name?: string; username?: string },
+    scope: DataScope,
+  ): Promise<Order> {
+    const entry = {
+      ...change,
+      by: String(actor.userId),
+      byName: actor.name || actor.username,
+      byRoles: actor.roles ?? [],
+      at: new Date(),
+    };
     const updatedOrder = await this.orderModel
       .findOneAndUpdate(
-        { _id: id, ...this.dataScopeService.toOrderFilter(scope) },
-        { $set: { "header.status": status } },
-        { new: true }, // Devuelve el documento actualizado
+        { _id: order._id, "header.status": change.from, ...this.dataScopeService.toOrderFilter(scope) },
+        { $set: { "header.status": change.to }, $push: { "header.statusHistory": entry } },
+        { new: true },
       )
       .exec();
 
     if (!updatedOrder) {
-      throw new NotFoundException(`Orden ${id} no encontrada`);
+      throw new ConflictException("La orden cambió de estado mientras tanto; recárgala y vuelve a intentarlo");
     }
 
     await this.notifyOrder("update", updatedOrder);
-
     return updatedOrder;
+  }
+
+  /**
+   * Purga de una orden de PRUEBA (solo ADMIN, lo exige el controller): solo si su nombre empieza por «ZZ Prueba».
+   * Borra también la trazabilidad de sus presupuestos y deja en el log quién purgó qué.
+   */
+  async purgeTestOrder(id: string, adminUserId: string): Promise<{ deleted: number; quoteEventsDeleted: number }> {
+    const order = await this.orderModel.findById(id).select("header.orderName header.orderNumber items.quoteTraceId").lean();
+    if (!order) throw new NotFoundException(`Orden ${id} no encontrada`);
+    if (!order.header.orderName.startsWith(TEST_ORDER_PREFIX)) {
+      throw new BadRequestException(`Solo se pueden purgar órdenes de prueba (nombre «${TEST_ORDER_PREFIX}…»)`);
+    }
+
+    let quoteEventsDeleted = 0;
+    for (const traceId of new Set(order.items.map((i) => i.quoteTraceId).filter(Boolean) as string[])) {
+      quoteEventsDeleted += (await this.quoteEventsService.purgeTrace(traceId, adminUserId, { includeOrdered: true })).deleted;
+    }
+    const { deletedCount } = await this.orderModel.deleteOne({ _id: id });
+    this.logger.warn(`Purga de orden de prueba: ADMIN ${adminUserId} borró ${order.header.orderNumber} «${order.header.orderName}»`);
+    return { deleted: deletedCount, quoteEventsDeleted };
   }
 
   async createFromCart(userId: string, orderName: string): Promise<Order> {
@@ -306,17 +474,17 @@ export class OrdersService {
     );
   }
 
-  // Helper para generar IDs tipo "ORD-2026-0045"
+  // Helper para generar IDs tipo "ORD-2026-0045": último número del año + 1. Con `countDocuments` un hueco
+  // (orden borrada que no era la última) repetía un número existente y el índice único rompía el checkout.
   private async generateOrderNumber(): Promise<string> {
-    const year = new Date().getFullYear();
-    const count = await this.orderModel.countDocuments({
-      "header.orderDate": {
-        $gte: new Date(year, 0, 1),
-        $lt: new Date(year + 1, 0, 1),
-      },
-    });
+    const prefix = `ORD-${new Date().getFullYear()}-`;
+    const last = await this.orderModel
+      .findOne({ "header.orderNumber": { $regex: `^${prefix}\\d+$` } })
+      .sort({ "header.orderNumber": -1 })
+      .select("header.orderNumber")
+      .lean();
+    const lastSequence = last ? parseInt(last.header.orderNumber.slice(prefix.length), 10) : 0;
     // Rellena con ceros: 0001, 0002...
-    const sequence = (count + 1).toString().padStart(4, "0");
-    return `ORD-${year}-${sequence}`;
+    return `${prefix}${(lastSequence + 1).toString().padStart(4, "0")}`;
   }
 }
