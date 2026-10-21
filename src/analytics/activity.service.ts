@@ -25,7 +25,7 @@ const FUNNEL_GROUP = {
   orderedPoints: { $sum: "$orderedPoints" },
 };
 
-const hasType = (type: QuoteEventType) => ({ $cond: [{ $in: [type, "$types"] }, 1, 0] });
+const hasType = (...types: QuoteEventType[]) => ({ $cond: [{ $or: types.map((type) => ({ $in: [type, "$types"] })) }, 1, 0] });
 const nonNull = (field: string) => ({ $filter: { input: field, cond: { $ne: ["$$this", null] } } });
 const firstNonNull = (field: string) => ({ $arrayElemAt: [nonNull(field), 0] });
 const lastNonNull = (field: string) => ({ $arrayElemAt: [nonNull(field), -1] });
@@ -92,7 +92,8 @@ export class ActivityService {
           calculated: hasType(QuoteEventType.CALCULATED),
           pdfDownloaded: hasType(QuoteEventType.PDF_DOWNLOADED),
           draftSaved: hasType(QuoteEventType.DRAFT_SAVED),
-          cartAdded: hasType(QuoteEventType.CART_ADDED),
+          // Acumulativo: todo pedido pasó por el carrito (el histórico reconstruido solo tiene ORDERED).
+          cartAdded: hasType(QuoteEventType.CART_ADDED, QuoteEventType.ORDERED),
           ordered: hasType(QuoteEventType.ORDERED),
         },
       },

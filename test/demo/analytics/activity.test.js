@@ -52,6 +52,8 @@ const { waitFor, findPricedPiece } = require('../_lib/fixtures');
       const row = r.body && (r.body.byUser || []).find((u) => u.id === myId);
       ownerQuotes = r.body && r.body.funnel && r.body.funnel.quotes;
       check('OWNER ve al USER de su fábrica con su draft', r.status === 200 && !!row && row.draftSaved >= 1, `status ${r.status}`);
+      const f = (r.body && r.body.funnel) || {};
+      check('embudo acumulativo: carrito ≥ pedidos', f.cartAdded >= f.ordered, `carrito ${f.cartAdded}, pedidos ${f.ordered}`);
       const future = await call('GET', '/admin/analytics/activity?startDate=2999-01-01', undefined, owner);
       check('filtro de fechas: futuro sin actividad', future.status === 200 && future.body.funnel.quotes === 0, `quotes ${future.body && future.body.funnel && future.body.funnel.quotes}`);
       const bad = await call('GET', '/admin/analytics/activity?startDate=ayer', undefined, owner);
