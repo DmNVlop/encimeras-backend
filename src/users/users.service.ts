@@ -92,7 +92,8 @@ export class UsersService {
       ...profile,
       username,
       roles,
-      factoryId: isFactoryScoped ? (factoryId ?? currentUserFactoryId) : factoryId,
+      // Sin factoryId explícito hereda la fábrica de quien crea (también ADMIN: el import CSV no la envía)
+      factoryId: factoryId ?? currentUserFactoryId,
       ownerId: finalOwnerId,
       managerId: finalManagerId,
       createdBy: currentUserId,
