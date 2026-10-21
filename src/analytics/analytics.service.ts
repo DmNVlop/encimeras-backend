@@ -5,32 +5,21 @@ import { Order } from "../orders/schemas/order.schema";
 import { Draft } from "../drafts/schemas/draft.schema";
 import { AnalyticsQueryDto, AnalyticsStatus } from "./dto/analytics-query.dto";
 import { AnalyticsSummaryDto } from "./dto/analytics-summary.dto";
-import { UsersService } from "../users/users.service";
-import { Role } from "../auth/enums/role.enum";
+import { DataScopeService, ScopeUser } from "../shared/scope/data-scope.service";
 
 @Injectable()
 export class AnalyticsService {
   constructor(
     @InjectModel(Order.name) private orderModel: Model<Order>,
     @InjectModel(Draft.name) private draftModel: Model<Draft>,
-    private usersService: UsersService,
+    private dataScopeService: DataScopeService,
   ) {}
 
-  private async resolveUserIdScope(user: { userId: string; roles: Role[] }): Promise<string[] | undefined> {
-    if (user.roles.includes(Role.ADMIN) || user.roles.includes(Role.OWNER)) {
-      return undefined;
-    }
-    if (user.roles.includes(Role.MANAGER)) {
-      const salesUsers = await this.usersService.findManagedByManager(user.userId);
-      const salesIds = salesUsers.map((u) => (u as any)._id.toString());
-      return [user.userId, ...salesIds];
-    }
-    return [user.userId];
-  }
-
-  async getSummary(query: AnalyticsQueryDto, user: { userId: string; roles: Role[] }): Promise<AnalyticsSummaryDto> {
-    const { startDate, endDate, status, factoryId } = query;
-    const userIdScope = await this.resolveUserIdScope(user);
+  async getSummary(query: AnalyticsQueryDto, user: ScopeUser): Promise<AnalyticsSummaryDto> {
+    const { startDate, endDate, status } = query;
+    const scope = await this.dataScopeService.resolve(user);
+    // Solo ADMIN puede acotar a una fábrica concreta; el resto ya queda limitado por su alcance.
+    const factoryId = scope.kind === "all" ? query.factoryId : undefined;
 
     const dateFilter: any = {};
     const effectiveStatus = status || AnalyticsStatus.ALL;
@@ -53,12 +42,12 @@ export class AnalyticsService {
     };
 
     if (effectiveStatus === AnalyticsStatus.ORDER || effectiveStatus === AnalyticsStatus.ALL) {
-      const orderResults = await this.aggregateOrders(dateFilter, factoryId, userIdScope);
+      const orderResults = await this.aggregateOrders(dateFilter, factoryId, this.dataScopeService.toOrderFilter(scope));
       this.mergeResults(results, orderResults);
     }
 
     if (effectiveStatus === AnalyticsStatus.DRAFT || effectiveStatus === AnalyticsStatus.ALL) {
-      const draftResults = await this.aggregateDrafts(dateFilter, factoryId, userIdScope);
+      const draftResults = await this.aggregateDrafts(dateFilter, factoryId, await this.dataScopeService.toDraftFilter(scope));
       this.mergeResults(results, draftResults);
     }
 
@@ -77,16 +66,13 @@ export class AnalyticsService {
     return results;
   }
 
-  private async aggregateOrders(dateFilter: any, factoryId?: string, userIdScope?: string[]) {
-    const match: any = {};
+  private async aggregateOrders(dateFilter: any, factoryId: string | undefined, scopeFilter: Record<string, any>) {
+    const match: any = { ...scopeFilter };
     if (Object.keys(dateFilter).length > 0) {
       match["header.orderDate"] = dateFilter;
     }
     if (factoryId) {
       match["items.core.factoryId"] = factoryId;
-    }
-    if (userIdScope) {
-      match["header.userId"] = { $in: userIdScope };
     }
 
     return this.orderModel.aggregate([
@@ -228,16 +214,13 @@ export class AnalyticsService {
     ]);
   }
 
-  private async aggregateDrafts(dateFilter: any, factoryId?: string, userIdScope?: string[]) {
-    const match: any = {};
+  private async aggregateDrafts(dateFilter: any, factoryId: string | undefined, scopeFilter: Record<string, any>) {
+    const match: any = { ...scopeFilter };
     if (Object.keys(dateFilter).length > 0) {
       match.createdAt = dateFilter;
     }
     if (factoryId) {
       match["core.factoryId"] = factoryId;
-    }
-    if (userIdScope) {
-      match.userId = { $in: userIdScope };
     }
 
     return this.draftModel.aggregate([

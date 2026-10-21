@@ -4,11 +4,11 @@ import { AnalyticsController } from "./analytics.controller";
 import { AnalyticsService } from "./analytics.service";
 import { Order, OrderSchema } from "../orders/schemas/order.schema";
 import { Draft, DraftSchema } from "../drafts/schemas/draft.schema";
-import { UsersModule } from "../users/users.module";
+import { DataScopeModule } from "../shared/scope/data-scope.module";
 
 @Module({
   imports: [
-    UsersModule,
+    DataScopeModule,
     MongooseModule.forFeature([
       { name: Order.name, schema: OrderSchema },
       { name: Draft.name, schema: DraftSchema },

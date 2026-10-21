@@ -8,6 +8,7 @@ import { EventsGateway } from "../events/events.gateway";
 import { CartService } from "../cart/cart.service";
 import { UsersService } from "../users/users.service";
 import { QuotesService } from "../quotes/quotes.service";
+import { DataScope, DataScopeService } from "../shared/scope/data-scope.service";
 
 @Injectable()
 export class OrdersService {
@@ -18,6 +19,7 @@ export class OrdersService {
     private cartService: CartService,
     private usersService: UsersService,
     private quotesService: QuotesService,
+    private dataScopeService: DataScopeService,
   ) {}
 
   /**
@@ -69,69 +71,22 @@ export class OrdersService {
   }
 
   /**
-   * Obtiene todas las órdenes pero filtrando solo el "Shared Header".
-   * Si se pasa ownerId, se filtra para que el usuario solo vea lo suyo.
+   * Lista las órdenes (solo el "Shared Header") dentro del alcance del usuario.
+   * El alcance lo resuelve DataScopeService (política única de "quién ve qué").
    */
-  async findAllHeaders(status?: string, ownerId?: string): Promise<any[]> {
-    const query: any = {};
-    if (status) query["header.status"] = status;
-    if (ownerId) query["header.userId"] = ownerId;
-
-    return this.orderModel.find(query).select("header").sort({ "header.orderDate": -1 }).lean();
-  }
-
-  async findAllByFactory(factoryId: string, status?: string): Promise<any[]> {
-    const query: any = { "items.core.factoryId": factoryId };
-    if (status) query["header.status"] = status;
-
-    const orders = await this.orderModel.find(query).select("header").sort({ "header.orderDate": -1 }).lean();
-
-    return orders;
-  }
-
-  async findAllByManager(managerId: string, status?: string): Promise<any[]> {
-    const salesUsers = await this.usersService.findManagedByManager(managerId);
-    const salesIds = salesUsers.map((u) => (u as any)._id.toString());
-    const ownerIds = [managerId, ...salesIds];
-
-    const query: any = { "header.userId": { $in: ownerIds } };
+  async findAllHeaders(scope: DataScope, status?: string): Promise<any[]> {
+    const query: any = this.dataScopeService.toOrderFilter(scope);
     if (status) query["header.status"] = status;
 
     return this.orderModel.find(query).select("header").sort({ "header.orderDate": -1 }).lean();
-  }
-
-  async findOneByManager(id: string, managerId: string): Promise<Order> {
-    const salesUsers = await this.usersService.findManagedByManager(managerId);
-    const salesIds = salesUsers.map((u) => (u as any)._id.toString());
-    const ownerIds = [managerId, ...salesIds];
-
-    const order = await this.orderModel.findOne({ _id: id, "header.userId": { $in: ownerIds } }).lean();
-
-    if (!order) {
-      throw new NotFoundException(`La orden con ID ${id} no existe o no tienes permiso para verla.`);
-    }
-    return order as unknown as Order;
   }
 
   /**
-   * Obtiene el detalle completo de una orden, incluyendo el technicalSnapshot.
-   * Se añade validación de propiedad si se proporciona ownerId (para rol USER).
+   * Detalle completo de una orden, incluyendo el technicalSnapshot.
+   * Fuera del alcance del usuario responde 404 (no revela que existe).
    */
-  async findOne(id: string, ownerId?: string): Promise<Order> {
-    const query: any = { _id: id };
-    if (ownerId) query["header.userId"] = ownerId;
-
-    const order = await this.orderModel.findOne(query).lean();
-
-    if (!order) {
-      throw new NotFoundException(`La orden con ID ${id} no existe o no tienes permiso para verla.`);
-    }
-
-    return order as unknown as Order;
-  }
-
-  async findOneByFactory(id: string, factoryId: string): Promise<Order> {
-    const order = await this.orderModel.findOne({ _id: id, "items.core.factoryId": factoryId }).lean();
+  async findOne(id: string, scope: DataScope): Promise<Order> {
+    const order = await this.orderModel.findOne({ _id: id, ...this.dataScopeService.toOrderFilter(scope) }).lean();
 
     if (!order) {
       throw new NotFoundException(`La orden con ID ${id} no existe o no tienes permiso para verla.`);
@@ -145,6 +100,22 @@ export class OrdersService {
    * si no cae al factoryId del usuario dueño de la orden. Si ninguno existe, no hay forma
    * válida de asignar la orden a una fábrica.
    */
+  /**
+   * Notifica por socket el header de la orden (con `_id` string) solo a las salas de quienes pueden verla.
+   * Efecto secundario: un fallo aquí nunca rompe la operación ya persistida.
+   */
+  private async notifyOrder(kind: "new" | "update", order: any): Promise<void> {
+    try {
+      const plain = typeof order.toObject === "function" ? order.toObject() : order;
+      const payload = { ...plain.header, _id: plain._id.toString() };
+      const rooms = await this.dataScopeService.orderAudienceRooms(plain.header, plain.items?.[0]?.core?.factoryId);
+      if (kind === "new") this.eventsGateway.notifyNewOrder(payload, rooms);
+      else this.eventsGateway.notifyOrderUpdate(payload, rooms);
+    } catch (error: any) {
+      console.error(`No se pudo notificar la orden por socket: ${error.message}`);
+    }
+  }
+
   private async resolveFactoryId(itemFactoryId: string | undefined, userId: string): Promise<string> {
     if (itemFactoryId) return itemFactoryId;
 
@@ -223,26 +194,16 @@ export class OrdersService {
     const savedOrder = await this.saveOrderWithAutoNaming(newOrder, userId, createOrderDto.orderName);
     await this.draftsService.markAsConverted(draft._id);
 
-    // Convertir a Objeto Plano (Limpia toda la basura interna de Mongoose)
-    const orderObject = savedOrder.toObject();
-
-    // 🔥 CORRECCIÓN: Enviamos el header PERO le pegamos el ID real
-    // convertimos a objeto plano (.toObject()) para poder mezclar propiedades
-    const payload = {
-      ...orderObject.header,
-      _id: orderObject._id,
-    };
-
-    // 🔥 Notificación en tiempo real
-    this.eventsGateway.notifyNewOrder(payload);
+    // 🔥 Notificación en tiempo real (solo a quienes pueden ver la orden)
+    await this.notifyOrder("new", savedOrder);
 
     return savedOrder;
   }
 
-  async updateStatus(id: string, status: string): Promise<Order> {
+  async updateStatus(id: string, status: string, scope: DataScope): Promise<Order> {
     const updatedOrder = await this.orderModel
-      .findByIdAndUpdate(
-        id,
+      .findOneAndUpdate(
+        { _id: id, ...this.dataScopeService.toOrderFilter(scope) },
         { $set: { "header.status": status } },
         { new: true }, // Devuelve el documento actualizado
       )
@@ -252,18 +213,7 @@ export class OrdersService {
       throw new NotFoundException(`Orden ${id} no encontrada`);
     }
 
-    // 🔥 CORRECCIÓN CRÍTICA: Convertir a objeto plano y stringificar ID
-    const plainOrder: any = updatedOrder.toObject();
-
-    const socketPayload = {
-      ...plainOrder.header, // Esparce status, orderNumber, etc.
-      _id: plainOrder._id.toString(), // Fuerza que sea string
-    };
-
-    // Log para verificar en consola del servidor
-    console.log("Emitiendo evento socket update:", socketPayload);
-
-    this.eventsGateway.notifyOrderUpdate(socketPayload);
+    await this.notifyOrder("update", updatedOrder);
 
     return updatedOrder;
   }
@@ -327,12 +277,7 @@ export class OrdersService {
     await (this.cartService as any).cartModel.findOneAndUpdate({ userId, status: "ACTIVE" }, { status: "CONVERTED" });
 
     // 7. Notificar
-    const orderObject = savedOrder.toObject();
-    const payload = {
-      ...orderObject.header,
-      _id: orderObject._id,
-    };
-    this.eventsGateway.notifyNewOrder(payload);
+    await this.notifyOrder("new", savedOrder);
 
     return savedOrder;
   }

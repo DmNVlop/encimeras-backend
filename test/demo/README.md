@@ -24,6 +24,8 @@ npm run test:demo -- all factory=DEMO             # todos
 | Grupo | Test | ¿Escribe? | Qué cubre |
 |---|---|---|---|
 | `users` | `generate-password.test.js` | Sí: 1 usuario `zz.prueba.pass.<marca>` (rol USER), borrado al final | `POST /users` con `generatePassword`: 201, `generatedPassword` de 12 caracteres, sin hash en la respuesta, login con ella, `factoryId` inferido del ADMIN; sin `password` ni `generatePassword` → 400 |
+| `scope` | `orders-scope.test.js` | No (el PATCH reenvía el estado actual; el DELETE usa un id inexistente) | Alcance por rol (`DataScopeService`): OWNER/WORKER ven solo su fábrica y reciben 404 en detalle y cambio de estado de órdenes ajenas; SALES/USER, 404 en detalle fuera de su alcance; USER solo ve lo suyo; analytics de OWNER ignora `factoryId` de la query; `DELETE /quotes/:id` exige ADMIN (403). Sin datos fuera de alcance, marca `OMITIDO` |
+| `scope` | `socket-scope.test.js` | No (el PATCH reenvía el estado actual) | Socket.io autenticado: sin token el servidor desconecta (paquete `41`); OWNER con token conecta y recibe `orders:update` de una orden de su fábrica. WebSocket nativo de Node, sin dependencias |
 
 ## Cómo añadir un test
 
