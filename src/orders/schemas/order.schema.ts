@@ -1,5 +1,36 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
 import { Document, Schema as MongooseSchema } from "mongoose";
+import { ORDER_STATUSES } from "../order-status-flow";
+
+// Cambio de estado (append-only): quién, cuándo, de dónde a dónde y por qué. Nunca se edita ni se borra.
+@Schema({ _id: false })
+export class OrderStatusChange {
+  @Prop({ required: true })
+  from: string;
+
+  @Prop({ required: true })
+  to: string;
+
+  @Prop({ required: true })
+  by: string; // userId de quien hizo el cambio
+
+  @Prop()
+  byName?: string; // Snapshot del nombre en el momento del cambio
+
+  @Prop({ type: [String], default: [] })
+  byRoles: string[];
+
+  @Prop({ required: true })
+  at: Date;
+
+  @Prop()
+  note?: string;
+
+  @Prop()
+  undo?: boolean; // true = revierte el último cambio vigente
+}
+
+export const OrderStatusChangeSchema = SchemaFactory.createForClass(OrderStatusChange);
 
 // 1. HEADER (Estandarizado para integración con ERP/CRM)
 @Schema({ _id: false })
@@ -16,8 +47,11 @@ export class OrderHeader {
   @Prop({ index: true })
   customerId?: string; // ID del cliente final B2B
 
-  @Prop({ required: true, default: "PENDING", enum: ["PENDING", "MANUFACTURING", "SHIPPED", "INSTALLED", "CANCELLED"] })
+  @Prop({ required: true, default: "PENDING", enum: [...ORDER_STATUSES] })
   status: string;
+
+  @Prop({ type: [OrderStatusChangeSchema], default: [] })
+  statusHistory: OrderStatusChange[]; // Órdenes anteriores a 2026-10-21 no lo tienen: su timeline arranca en el estado actual
 
   @Prop({ required: true })
   totalPoints: number; // Valor inmutable final
@@ -92,3 +126,6 @@ export class Order extends Document {
 export const OrderSchema = SchemaFactory.createForClass(Order);
 
 OrderSchema.index({ "header.userId": 1, "header.orderName": 1 }, { unique: true });
+// Bandeja paginada (GET /orders/search): alcance de fábrica / por estado, ordenado por fecha
+OrderSchema.index({ "items.core.factoryId": 1, "header.status": 1, "header.orderDate": -1 });
+OrderSchema.index({ "header.status": 1, "header.orderDate": -1 });

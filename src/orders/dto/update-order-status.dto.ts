@@ -1,22 +1,24 @@
-import { IsString, IsNotEmpty, IsIn } from "class-validator";
-
-// Lista de estados permitidos en tu flujo de fábrica
-const ALLOWED_STATUSES = [
-  "PENDING", // Recién llegada
-  "REVIEWED", // Revisada por técnico
-  "APPROVED", // Aprobada para fabricar (Lista para Ardis)
-  "REJECTED", // Devuelta al cliente
-  "MANUFACTURING", // En máquinas
-  "SHIPPED", // Enviada
-  "INSTALLED", // Terminada
-  "CANCELLED", // Cancelada definitivamente
-];
+import { IsString, IsNotEmpty, IsIn, IsOptional, MaxLength } from "class-validator";
+import { ORDER_STATUSES } from "../order-status-flow";
 
 export class UpdateOrderStatusDto {
   @IsString()
   @IsNotEmpty()
-  @IsIn(ALLOWED_STATUSES, {
-    message: `El estado debe ser uno de los siguientes: ${ALLOWED_STATUSES.join(", ")}`,
+  @IsIn([...ORDER_STATUSES], {
+    message: `El estado debe ser uno de los siguientes: ${ORDER_STATUSES.join(", ")}`,
   })
   status: string;
+
+  // Obligatoria en REJECTED/CANCELLED (lo valida el servicio: depende del estado destino)
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  note?: string;
+}
+
+export class UndoOrderStatusDto {
+  @IsString()
+  @IsNotEmpty({ message: "La nota es obligatoria para deshacer un cambio de estado" })
+  @MaxLength(1000)
+  note: string;
 }

@@ -91,11 +91,13 @@ export class QuoteEventsService {
   }
 
   /**
-   * Única excepción al append-only: purga de una traza que nunca llegó a orden (datos de prueba).
+   * Única excepción al append-only: purga de una traza que nunca llegó a orden (datos de prueba), o la de una
+   * orden de prueba que se purga a la vez (`includeOrdered`, solo desde `OrdersService.purgeTestOrder`).
    * Solo ADMIN (lo exige el controller); deja en el log quién purgó qué.
    */
-  async purgeTrace(quoteTraceId: string, adminUserId: string): Promise<{ deleted: number }> {
-    if (await this.quoteEventModel.exists({ quoteTraceId, type: QuoteEventType.ORDERED })) {
+  async purgeTrace(quoteTraceId: string, adminUserId: string, options: { includeOrdered?: boolean } = {}): Promise<{ deleted: number }> {
+    // includeOrdered: solo la purga de una orden de prueba (OrdersService.purgeTestOrder), que borra la orden a la vez
+    if (!options.includeOrdered && (await this.quoteEventModel.exists({ quoteTraceId, type: QuoteEventType.ORDERED }))) {
       throw new ConflictException("No se puede purgar la traza de un presupuesto que llegó a orden");
     }
     const { deletedCount } = await this.quoteEventModel.deleteMany({ quoteTraceId });

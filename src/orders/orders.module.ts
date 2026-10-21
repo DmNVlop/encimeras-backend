@@ -13,6 +13,7 @@ import { QuotesModule } from "../quotes/quotes.module";
 import { forwardRef } from "@nestjs/common";
 import { DataScopeModule } from "../shared/scope/data-scope.module";
 import { QuoteEventsModule } from "../quote-events/quote-events.module";
+import { DisplayNamesModule } from "../shared/display-names/display-names.module";
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { QuoteEventsModule } from "../quote-events/quote-events.module";
     QuotesModule,
     DataScopeModule,
     QuoteEventsModule,
+    DisplayNamesModule,
     MongooseModule.forFeature([{ name: Order.name, schema: OrderSchema }]),
     BullModule.registerQueue({
       name: "cart",
