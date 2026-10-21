@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { Test, TestingModule } from "@nestjs/testing";
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { getModelToken } from "@nestjs/mongoose";
@@ -13,6 +14,7 @@ import { Cart } from "../src/cart/schemas/cart.schema";
 import { Order } from "../src/orders/schemas/order.schema";
 import { Role } from "../src/auth/enums/role.enum";
 import { PriceConfig } from "../src/price-configs/schemas/price-config.schema";
+import { QuoteEvent } from "../src/quote-events/schemas/quote-event.schema";
 
 /**
  * E2E — Flujo completo de creación de Order.
@@ -39,10 +41,12 @@ describe("Order creation flow (e2e)", () => {
   let cartModel: Model<Cart>;
   let orderModel: Model<Order>;
   let priceConfigModel: Model<PriceConfig>;
+  let quoteEventModel: Model<QuoteEvent>;
 
   const TEST_TAG = `E2E_ORDER_FLOW_${Date.now()}`;
   const testUsername = `${TEST_TAG}_user`;
-  const testPassword = "Test1234!";
+  // Aleatoria por ejecución: ninguna credencial fija en el repo
+  const testPassword = `T-${randomUUID()}`;
   const testFactoryId = new Types.ObjectId().toString();
 
   let testUserId: string;
@@ -78,6 +82,7 @@ describe("Order creation flow (e2e)", () => {
     cartModel = moduleFixture.get<Model<Cart>>(getModelToken(Cart.name));
     orderModel = moduleFixture.get<Model<Order>>(getModelToken(Order.name));
     priceConfigModel = moduleFixture.get<Model<PriceConfig>>(getModelToken(PriceConfig.name));
+    quoteEventModel = moduleFixture.get<Model<QuoteEvent>>(getModelToken(QuoteEvent.name));
 
     // --- Fixture: usuario de prueba (OWNER con factoryId propio) ---
     const hashedPassword = await bcrypt.hash(testPassword, 10);
@@ -127,6 +132,8 @@ describe("Order creation flow (e2e)", () => {
     if (materialModel && testMaterialId) await materialModel.deleteOne({ _id: testMaterialId });
     if (priceConfigModel && testPriceConfigId) await priceConfigModel.deleteOne({ _id: testPriceConfigId });
     if (userModel && testUserId) await userModel.deleteOne({ _id: testUserId });
+    // Trazabilidad (fire-and-forget): eventos del usuario y de la fábrica ficticia de la prueba
+    if (quoteEventModel) await quoteEventModel.deleteMany({ $or: [{ factoryId: testFactoryId }, ...(testUserId ? [{ userId: testUserId }] : [])] });
 
     if (app) await app.close();
   });

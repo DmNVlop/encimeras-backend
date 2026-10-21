@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsString, IsNotEmpty, IsEmail, IsArray, IsEnum, IsOptional, MinLength, IsMongoId } from "class-validator";
+import { IsString, IsNotEmpty, IsEmail, IsArray, IsEnum, IsOptional, MinLength, IsMongoId, IsBoolean, ValidateIf } from "class-validator";
 import { Role } from "../../auth/enums/role.enum";
 
 export class CreateUserDto {
@@ -15,10 +15,19 @@ export class CreateUserDto {
     description: "Contraseña del usuario (mínimo 6 caracteres)",
     example: "123456",
   })
+  @ValidateIf((dto: CreateUserDto) => !dto.generatePassword)
   @IsString()
   @IsNotEmpty()
   @MinLength(6)
-  password: string;
+  password?: string;
+
+  @ApiPropertyOptional({
+    description: "Si es true, el backend genera una contraseña aleatoria (se ignora `password`) y la devuelve UNA sola vez en `generatedPassword`",
+    example: true,
+  })
+  @IsBoolean()
+  @IsOptional()
+  generatePassword?: boolean;
 
   @ApiPropertyOptional({
     description: "Roles asignados al usuario",

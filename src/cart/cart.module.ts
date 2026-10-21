@@ -9,6 +9,7 @@ import { DraftsModule } from "../drafts/drafts.module";
 import { MaterialsModule } from "../materials/materials.module";
 import { DiscountRulesModule } from "../discount-rules/discount-rules.module";
 import { CustomersModule } from "../customers/customers.module";
+import { QuoteEventsModule } from "../quote-events/quote-events.module";
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { CustomersModule } from "../customers/customers.module";
     MaterialsModule, // Para hidratación de datos (BFF)
     DiscountRulesModule, // Para reglas de descuento globales
     CustomersModule, // Para validar clientes asignados
+    QuoteEventsModule, // Trazabilidad: evento CART_ADDED
   ],
 
   controllers: [CartController],

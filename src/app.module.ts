@@ -32,6 +32,7 @@ import { CartModule } from "./cart/cart.module";
 import { DocumentSettingsModule } from "./document-settings/document-settings.module";
 import { GlobalSettingsModule } from "./settings/global-settings.module";
 import { FactorySettingsModule } from "./factory-settings/factory-settings.module";
+import { QuoteEventsModule } from "./quote-events/quote-events.module";
 
 import { AnalyticsModule } from "./analytics/analytics.module";
 
@@ -101,6 +102,7 @@ import { RedisCheckService } from "./redis-check.service";
     DocumentSettingsModule,
     GlobalSettingsModule,
     FactorySettingsModule,
+    QuoteEventsModule,
   ],
   controllers: [AppController],
   providers: [AppService, RedisCheckService],

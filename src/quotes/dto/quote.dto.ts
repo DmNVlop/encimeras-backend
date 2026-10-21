@@ -1,6 +1,6 @@
 // src/quotes/dto/quote.dto.ts
 import { ApiProperty } from "@nestjs/swagger";
-import { IsString, IsNotEmpty, IsObject, IsMongoId, IsOptional, IsArray, ValidateNested, IsNumber, Min } from "class-validator";
+import { IsString, IsNotEmpty, IsObject, IsMongoId, IsOptional, IsArray, ValidateNested, IsNumber, Min, IsUUID } from "class-validator";
 import { Type } from "class-transformer";
 
 // 1. DTO para el Accesorio Aplicado (Dentro de una pieza)
@@ -70,4 +70,9 @@ export class CalculateQuoteDto {
   @IsString()
   @IsOptional()
   factoryId?: string;
+
+  @ApiProperty({ description: "Id de trazabilidad del presupuesto (generado en el frontend)", required: false })
+  @IsUUID()
+  @IsOptional()
+  quoteTraceId?: string;
 }

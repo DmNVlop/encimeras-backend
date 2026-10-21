@@ -17,7 +17,6 @@ import { MainPiece } from "src/main-pieces/schemas/main-pieces.schema";
 import { Addon } from "src/addons/schemas/addons.schema";
 import { DiscountEngineService } from "src/discount-rules/discount-engine.service";
 import { CustomersService } from "src/customers/customers.service";
-import { UsersService } from "src/users/users.service";
 
 // Tipos Helper
 type MainPieceData = CalculateQuoteDto["mainPieces"][0];
@@ -34,7 +33,6 @@ export class QuotesService {
     private readonly mainPiecesService: MainPiecesService,
     private readonly discountEngineService: DiscountEngineService,
     private readonly customersService: CustomersService,
-    private readonly usersService: UsersService,
   ) {}
 
   // ===========================================================================
@@ -193,61 +191,31 @@ export class QuotesService {
     return newQuote.save();
   }
 
-  // --- CRUD ADMIN (Sin cambios mayores) ---
-  findAll() {
+  // --- LECTURAS CON ALCANCE (filtro de DataScopeService.toQuoteFilter) ---
+  findAll(scopeFilter: Record<string, any> = {}) {
     return this.quoteModel
-      .find()
+      .find(scopeFilter)
       .populate({ path: "mainPieces", populate: { path: "materialId" } })
       .exec();
   }
 
-  async findAllByFactory(factoryId: string): Promise<Quote[]> {
-    const quotes = await this.quoteModel
-      .find()
+  async findOne(id: string, scopeFilter: Record<string, any> = {}): Promise<Quote> {
+    const quote = await this.quoteModel
+      .findOne({ _id: id, ...scopeFilter })
       .populate({ path: "mainPieces", populate: { path: "materialId" } })
       .exec();
-    return quotes;
-  }
-
-  findOne(id: string) {
-    return this.quoteModel
-      .findById(id)
-      .populate({ path: "mainPieces", populate: { path: "materialId" } })
-      .exec();
-  }
-
-  async findOneByFactory(id: string, factoryId: string): Promise<Quote> {
-    const quote = await this.findOne(id);
     if (!quote) {
       throw new NotFoundException(`Quote with ID "${id}" not found`);
     }
     return quote;
   }
 
-  async findAllByManager(managerId: string): Promise<Quote[]> {
-    const salesUsers = await this.usersService.findManagedByManager(managerId);
-    const salesIds = salesUsers.map((u) => (u as any)._id.toString());
-    const creatorIds = [managerId, ...salesIds];
-
-    return this.quoteModel
-      .find({ createdBy: { $in: creatorIds } })
-      .populate({ path: "mainPieces", populate: { path: "materialId" } })
-      .exec();
-  }
-
-  async findOneByManager(id: string, managerId: string): Promise<Quote> {
-    const salesUsers = await this.usersService.findManagedByManager(managerId);
-    const salesIds = salesUsers.map((u) => (u as any)._id.toString());
-    const creatorIds = [managerId, ...salesIds];
-
-    const quote = await this.quoteModel
-      .findOne({ _id: id, createdBy: { $in: creatorIds } })
-      .populate({ path: "mainPieces", populate: { path: "materialId" } })
-      .exec();
-    if (!quote) {
-      throw new NotFoundException(`Quote with ID "${id}" not found or access denied`);
+  /** Lanza 404 si el quote no existe o queda fuera del alcance del usuario. */
+  async assertInScope(id: string, scopeFilter: Record<string, any>): Promise<void> {
+    const exists = await this.quoteModel.exists({ _id: id, ...scopeFilter });
+    if (!exists) {
+      throw new NotFoundException(`Quote with ID "${id}" not found`);
     }
-    return quote;
   }
 
   remove(id: string) {

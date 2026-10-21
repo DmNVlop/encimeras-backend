@@ -9,6 +9,9 @@ export class CartItem {
   @Prop({ required: true })
   customName: string; // Ej: "Cocina de Juana"
 
+  @Prop()
+  quoteTraceId?: string; // Id de trazabilidad del presupuesto (estable en draft → cart → order)
+
   @Prop({ type: MongooseSchema.Types.Mixed, required: true })
   core: {
     mainPieces: any[];

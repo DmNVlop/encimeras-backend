@@ -1,43 +1,61 @@
-import { WebSocketGateway, WebSocketServer, OnGatewayConnection, OnGatewayDisconnect } from "@nestjs/websockets";
+import { Logger } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import { WebSocketGateway, WebSocketServer, OnGatewayConnection } from "@nestjs/websockets";
 import { Server, Socket } from "socket.io";
+import { DataScopeService } from "../shared/scope/data-scope.service";
 
+/**
+ * Tiempo real de órdenes. Solo se aceptan conexiones con JWT válido (`handshake.auth.token`);
+ * cada socket entra en las salas de su alcance (DataScopeService.roomsFor) y cada evento se
+ * emite únicamente a las salas de quienes pueden ver esa orden.
+ */
 @WebSocketGateway({
   cors: {
     origin: "*", // ⚠️ En producción, cambia esto por la URL de tu admin (ej: https://admin.kuuk.com)
   },
 })
-export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class EventsGateway implements OnGatewayConnection {
+  private readonly logger = new Logger(EventsGateway.name);
+
   @WebSocketServer()
   server: Server;
 
-  handleConnection(client: Socket) {
-    // Opcional: Log para debug
-    // console.log(`Admin conectado: ${client.id}`);
-  }
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly dataScopeService: DataScopeService,
+  ) {}
 
-  handleDisconnect(client: Socket) {
-    // console.log(`Admin desconectado: ${client.id}`);
+  async handleConnection(client: Socket) {
+    try {
+      const payload = await this.jwtService.verifyAsync(client.handshake.auth?.token);
+      const user = { userId: String(payload.sub), roles: payload.roles || [], factoryId: payload.factoryId || null };
+      const scope = await this.dataScopeService.resolve(user);
+      await client.join(this.dataScopeService.roomsFor(scope, user.userId));
+    } catch {
+      this.logger.warn(`Conexión WS rechazada (token ausente o inválido): ${client.id}`);
+      client.disconnect(true);
+    }
   }
 
   /**
-   * Emite una nueva orden a todos los clientes conectados.
+   * Emite una nueva orden a quienes pueden verla.
    * Payload optimizado: Solo headers, no el snapshot técnico completo.
    */
-  notifyNewOrder(orderHeader: any) {
-    this.server.emit("orders:new", orderHeader);
+  notifyNewOrder(orderHeader: any, rooms: string[]) {
+    this.server.to(rooms).emit("orders:new", orderHeader);
   }
 
   /**
    * Notifica que una orden existente ha cambiado (ej. cambio de estado)
    */
-  notifyOrderUpdate(orderHeaderWithId: any) {
-    this.server.emit("orders:update", orderHeaderWithId);
+  notifyOrderUpdate(orderHeaderWithId: any, rooms: string[]) {
+    this.server.to(rooms).emit("orders:update", orderHeaderWithId);
   }
 
   /**
-   * Notifica un fallo en el procesamiento asíncrono de una orden
+   * Notifica un fallo en el procesamiento asíncrono de una orden (solo al usuario afectado)
    */
   notifyOrderFailure(payload: { jobId: string; userId: string; message: string }) {
-    this.server.emit("orders:fail", payload);
+    this.server.to(`user:${payload.userId}`).emit("orders:fail", payload);
   }
 }

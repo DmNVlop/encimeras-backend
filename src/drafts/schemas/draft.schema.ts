@@ -12,6 +12,9 @@ export class Draft extends Document {
   @Prop({ required: false })
   name?: string; // Nombre personalizado del borrador
 
+  @Prop({ index: true })
+  quoteTraceId?: string; // Id de trazabilidad del presupuesto (estable en draft → cart → order)
+
   // Datos estrictos de negocio
   @Prop({ type: MongooseSchema.Types.Mixed, required: true })
   core: {
